@@ -50,7 +50,7 @@ Servo servo;
 enum SensorType { SENS_NONE, SENS_BH1750, SENS_BMP280 };
 SensorType sensType = SENS_NONE;
 uint8_t sensAddr = 0;
-uint16_t T1; int16_t T2, T3;   // BMP/BME280 temperature calibration
+uint16_t digT1; int16_t digT2, digT3;   // BMP/BME280 temperature calibration
 
 bool i2cPresent(uint8_t a) { Wire.beginTransmission(a); return Wire.endTransmission() == 0; }
 
@@ -75,7 +75,7 @@ void detectSensor() {
     uint8_t id = rd8(a, 0xD0);
     if (id == 0x58 || id == 0x60) {
       sensType = SENS_BMP280; sensAddr = a;
-      T1 = rd16le(a, 0x88); T2 = (int16_t)rd16le(a, 0x8A); T3 = (int16_t)rd16le(a, 0x8C);
+      digT1 = rd16le(a, 0x88); digT2 = (int16_t)rd16le(a, 0x8A); digT3 = (int16_t)rd16le(a, 0x8C);
       wr8(a, 0xF4, 0x27);  // normal mode, temp + pressure oversampling x1
       Serial.printf("sensor: %s at 0x%02X\n", id == 0x60 ? "BME280" : "BMP280", a); return;
     }
@@ -93,8 +93,8 @@ bool readSensor(float& v) {
   }
   if (sensType == SENS_BMP280) {
     int32_t adc = ((int32_t)rd8(sensAddr, 0xFA) << 12) | ((int32_t)rd8(sensAddr, 0xFB) << 4) | (rd8(sensAddr, 0xFC) >> 4);
-    int32_t var1 = ((((adc >> 3) - ((int32_t)T1 << 1))) * ((int32_t)T2)) >> 11;
-    int32_t var2 = (((((adc >> 4) - ((int32_t)T1)) * ((adc >> 4) - ((int32_t)T1))) >> 12) * ((int32_t)T3)) >> 14;
+    int32_t var1 = ((((adc >> 3) - ((int32_t)digT1 << 1))) * ((int32_t)digT2)) >> 11;
+    int32_t var2 = (((((adc >> 4) - ((int32_t)digT1)) * ((adc >> 4) - ((int32_t)digT1))) >> 12) * ((int32_t)digT3)) >> 14;
     v = ((var1 + var2) * 5 + 128) / 25600.0f; return true;
   }
   return false;
