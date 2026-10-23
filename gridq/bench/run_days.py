@@ -126,7 +126,8 @@ def report(p, results, controllers):
         e["wall_s"].append(res["wall_s"])
         e["solve_fail"] += res["solve_fail"]
         e["max_residual"] = max(e["max_residual"], res["max_residual"])
-    out = {"per_day": per, "tune": {}, "report": {}, "controllers": controllers, "extra": {}}
+    out = {"per_day": per, "tune": {}, "report": {}, "controllers": controllers, "extra": {},
+           "tune_days": [t0, t1], "report_days": [r0, r1]}
     for c in controllers:
         tune = [d for d in per[c] if t0 <= d["day"] <= t1]
         rep = [d for d in per[c] if r0 <= d["day"] <= r1]

@@ -1,16 +1,17 @@
 :root {
   --bg: #0d1117; --panel: #151b24; --panel2: #1b2330; --line: #2a3442; --text: #e6edf3; --muted: #8b98a8;
   --ok: #3fb950; --warn: #d29922; --bad: #f85149; --info: #58a6ff;
-  --pv: #e3b341; --grid: #8b98a8; --batt: #58a6ff; --dg: #f0883e; --load: #e6edf3; --soc: #a371f7;
-  --b0: #8b98a8; --b1: #6e7681; --gq: #3fb950; --or: #a371f7;
+  /* chart palettes validated with the dataviz validator (CVD + normal-vision floors), dark steps */
+  --pv: #c98500; --batt: #3987e5; --grid: #199e70; --dg: #d95926; --load: #e6edf3; --soc: #3987e5;
+  --b0: #199e70; --b1: #d95926; --gq: #3987e5; --or: #d55181;
   --r: 10px;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #f6f8fa; --panel: #ffffff; --panel2: #f0f3f6; --line: #d0d7de; --text: #1f2328; --muted: #59636e;
     --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --info: #0969da;
-    --pv: #b08800; --grid: #6e7781; --batt: #0969da; --dg: #bc4c00; --load: #1f2328; --soc: #8250df;
-    --b0: #8c959f; --b1: #57606a; --gq: #1a7f37; --or: #8250df;
+    --pv: #eda100; --batt: #2a78d6; --grid: #1baf7a; --dg: #eb6834; --load: #1f2328; --soc: #2a78d6;
+    --b0: #1baf7a; --b1: #eb6834; --gq: #2a78d6; --or: #e87ba4;
   }
 }
 * { box-sizing: border-box; }
@@ -103,7 +104,7 @@ button.big.ghost { border-style: dashed; }
 .events { margin: 0; padding-left: 18px; font-size: 13px; }
 .events li { padding: 2px 0; }
 .headline { text-align: center; }
-.hl-big { font-size: 52px; font-weight: 800; color: var(--gq); }
+.hl-big { font-size: 52px; font-weight: 800; color: var(--text); }
 .hl-sub { color: var(--muted); }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 560px; }
@@ -117,3 +118,11 @@ tr.gq td { background: color-mix(in srgb, var(--gq) 8%, transparent); }
 .replay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .replay-grid > div { background: var(--panel2); border-radius: 8px; padding: 10px; }
 .replay-grid .big-n { font-size: 26px; font-weight: 700; }
+
+.chart { position: relative; }
+.chart.short { height: 120px; }
+.tip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 8px; font-size: 12px; white-space: nowrap; z-index: 3; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.tip b { font-weight: 600; }
+.tip .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.chart .xh { stroke: var(--muted); stroke-width: 1; }

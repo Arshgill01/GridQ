@@ -82,8 +82,8 @@ function render(s) {
   const why = whyHtml(s.explanations, s);
   $("#why-live").innerHTML = why;
   $("#why-plan").innerHTML = why;
-  if ($("#tab-live").classList.contains("on")) histChart(s.hist);
-  if ($("#tab-plan").classList.contains("on") && s.plan) planChart(s);
+  if ($("#tab-live").classList.contains("on") && !$("#chart-hist .tip:not([hidden])")) histChart(s.hist);
+  if ($("#tab-plan").classList.contains("on") && s.plan && !planHover()) planChart(s);
   $("#events").innerHTML = (s.events || []).slice().reverse().map((e) =>
     `<li><b>${e.type}</b> ${Object.entries(e.params || {}).map(([k, v]) => `${k}=${typeof v === "number" ? fmt(v, 2) : v}`).join(" ")} <span class="muted">· ${e.source} · ${clockOf(e.step)}</span></li>`).join("");
   const fl = [];
@@ -95,6 +95,7 @@ function render(s) {
     `Live day: held-out ${s.date} · bridge: ${s.mcu.bridge} · MCU ${s.mcu.mode === "S" ? "SAFE" : "NORMAL"} mask ${s.mcu.applied_mask} · control: ${s.control_source || "—"}`;
 }
 
+function planHover() { return !!document.querySelector("#chart-plan .tip:not([hidden]), #chart-soc .tip:not([hidden])"); }
 function setSrc(sel, txt, on) { const e = $(sel); e.querySelector(".v").textContent = txt; e.classList.toggle("off", !on); }
 function hm(h) { const H = Math.floor(h); const M = Math.round((h - H) * 60); return `${H}h ${String(M).padStart(2, "0")}m`; }
 function clockOf(step) { const sod = ((step % 96) + 96) % 96; return `${String(Math.floor(sod / 4)).padStart(2, "0")}:${String((sod % 4) * 15).padStart(2, "0")}`; }
@@ -118,67 +119,98 @@ function whyHtml(items, s) {
 }
 
 // ---------------------------------------------------------------- SVG charts
-function svg(el, W, H) { el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"></svg>`; return el.firstChild; }
-function path(pts) { return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(""); }
+// One y-axis per chart (no dual axes), thin marks, recessive grid, crosshair tooltip on hover.
 function add(s, tag, attrs) { const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) e.setAttribute(k, attrs[k]); s.appendChild(e); return e; }
+function path(pts) { return pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join(""); }
 
-function axes(s, W, H, pad, ymax, unit, xlabels) {
+// spec: {n, ymin, ymax, unit, xlabel(i), areas:[{key,label,color,vals}], lines:[{label,color,vals,width,dash}], tip(i)->html}
+function chart(el, spec) {
+  const W = Math.max(300, el.clientWidth), H = el.clientHeight || 200;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}"></svg><div class="tip" hidden></div>`;
+  const sv = el.firstChild, tip = el.lastChild;
+  const pad = { l: 40, r: 10, t: 8, b: 20 }, n = spec.n;
+  const ymin = spec.ymin || 0, ymax = spec.ymax;
+  const x = (i) => pad.l + (W - pad.l - pad.r) * i / Math.max(1, n - 1);
+  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - ymin) / (ymax - ymin));
   for (let i = 0; i <= 4; i++) {
-    const y = pad.t + (H - pad.t - pad.b) * (1 - i / 4);
-    add(s, "line", { x1: pad.l, x2: W - pad.r, y1: y, y2: y, class: "ax", "stroke-width": 0.5 });
-    add(s, "text", { x: pad.l - 4, y: y + 3, "text-anchor": "end" }).textContent = Math.round(ymax * i / 4) + (i === 4 ? unit : "");
+    const v = ymin + (ymax - ymin) * i / 4;
+    add(sv, "line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: "ax", "stroke-width": 0.5 });
+    add(sv, "text", { x: pad.l - 5, y: y(v) + 3.5, "text-anchor": "end" }).textContent = (spec.yfmt || ((u) => Math.round(u)))(v) + (i === 4 ? spec.unit : "");
   }
-  xlabels.forEach(([x, t]) => { add(s, "text", { x, y: H - 4, "text-anchor": "middle" }).textContent = t; });
+  const step = Math.max(1, Math.round(n / 6));
+  for (let i = 0; i < n; i += step) add(sv, "text", { x: x(i), y: H - 5, "text-anchor": "middle" }).textContent = spec.xlabel(i);
+  let base = Array(n).fill(0);
+  (spec.areas || []).forEach((a) => {
+    const top = a.vals.map((v, i) => base[i] + Math.max(0, v || 0));
+    const pts = top.map((v, i) => [x(i), y(v)]).concat(base.map((v, i) => [x(i), y(v)]).reverse());
+    add(sv, "path", { d: path(pts) + "Z", fill: a.color, "fill-opacity": 0.85, stroke: css("--panel"), "stroke-width": 1 });
+    base = top;
+  });
+  (spec.lines || []).forEach((l) => add(sv, "path", { d: path(l.vals.map((v, i) => [x(i), y(v == null ? ymin : v)])), fill: "none",
+    stroke: l.color, "stroke-width": l.width || 2, "stroke-dasharray": l.dash || "", "stroke-linejoin": "round" }));
+  const xh = add(sv, "line", { class: "xh", y1: pad.t, y2: H - pad.b, x1: -10, x2: -10 });
+  const hit = add(sv, "rect", { x: pad.l, y: 0, width: W - pad.l - pad.r, height: H, fill: "transparent" });
+  const move = (ev) => {
+    const r = sv.getBoundingClientRect();
+    const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    const i = Math.max(0, Math.min(n - 1, Math.round((px * W / r.width - pad.l) / ((W - pad.l - pad.r) / Math.max(1, n - 1)))));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i));
+    tip.innerHTML = spec.tip(i);
+    tip.hidden = false;
+    const left = x(i) * r.width / W;
+    tip.style.left = Math.min(Math.max(0, left + 12), r.width - tip.offsetWidth - 4) + "px";
+    tip.style.top = "6px";
+  };
+  hit.addEventListener("mousemove", move);
+  hit.addEventListener("touchmove", move, { passive: true });
+  hit.addEventListener("mouseleave", () => { tip.hidden = true; xh.setAttribute("x1", -10); xh.setAttribute("x2", -10); });
 }
+const sw = (c) => `<span class="sw" style="background:${c}"></span>`;
+const tipRows = (title, rows) => `<b>${title}</b>` + rows.map(([c, l, v]) => `<div>${c ? sw(c) : ""}${l}: <b>${v}</b></div>`).join("");
 
 function planChart(s) {
-  const el = $("#chart-plan");
-  const W = Math.max(320, el.clientWidth), H = el.clientHeight || 260;
-  const sv = svg(el, W, H);
-  const h = s.plan.horizon, n = h.grid.length, pad = { l: 34, r: 34, t: 8, b: 18 };
-  const series = [["pv_used", css("--pv"), "PV used"], ["grid", css("--grid"), "Grid"], ["dis", css("--batt"), "Battery out"], ["dg", css("--dg"), "Diesel"]];
-  const stack = Array(n).fill(0);
-  const tops = series.map(([k]) => h[k].map((v, i) => (stack[i] += Math.max(0, v))));
-  const ymax = Math.max(10, ...stack, ...h.load) * 1.08;
-  const x = (i) => pad.l + (W - pad.l - pad.r) * i / (n - 1);
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / ymax);
-  const xl = [];
-  for (let i = 0; i < n; i += 16) xl.push([x(i), clockOf(s.plan.step + i)]);
-  axes(sv, W, H, pad, ymax, " kW", xl);
-  let prev = Array(n).fill(0);
-  series.forEach(([k, col], j) => {
-    const top = tops[j];
-    const pts = top.map((v, i) => [x(i), y(v)]).concat(prev.map((v, i) => [x(i), y(v)]).reverse());
-    add(sv, "path", { d: path(pts) + "Z", fill: col, opacity: 0.75 });
-    prev = top;
+  const h = s.plan.horizon, n = h.grid.length;
+  const areas = [
+    { label: "PV used", color: css("--pv"), vals: h.pv_used },
+    { label: "Battery out", color: css("--batt"), vals: h.dis },
+    { label: "Grid", color: css("--grid"), vals: h.grid },
+    { label: "Diesel", color: css("--dg"), vals: h.dg },
+  ];
+  const tot = h.grid.map((_, i) => areas.reduce((a, b) => a + Math.max(0, b.vals[i]), 0));
+  const ymax = Math.ceil(Math.max(10, ...tot, ...h.load, ...h.dem_p50) * 1.1 / 10) * 10;
+  chart($("#chart-plan"), {
+    n, ymax, unit: " kW", xlabel: (i) => clockOf(s.plan.step + i), areas,
+    lines: [{ label: "Planned load", color: css("--load"), vals: h.load, width: 1.6 }],
+    tip: (i) => tipRows(`${clockOf(s.plan.step + i)} plan`, [
+      ...areas.map((a) => [a.color, a.label, fmt(a.vals[i]) + " kW"]),
+      [css("--load"), "planned load", fmt(h.load[i]) + " kW"],
+      ["", "forecast demand P50", fmt(h.dem_p50[i]) + " kW"],
+      ["", "EV / heater / pump", `${fmt(h.p_ev[i])} / ${fmt(h.p_heater[i])} / ${fmt(h.p_pump[i])} kW`],
+      ["", "battery charging", fmt(h.ch[i]) + " kW"]]),
   });
-  add(sv, "path", { d: path(h.load.map((v, i) => [x(i), y(v)])), fill: "none", stroke: css("--load"), "stroke-width": 1.6 });
-  add(sv, "path", { d: path(h.dem_p50.map((v, i) => [x(i), y(v)])), fill: "none", stroke: css("--load"), "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0.6 });
-  // SoC on right axis (0..cap)
+  $("#plan-legend").innerHTML = areas.map((a) => `<span><i style="background:${a.color}"></i>${a.label}</span>`).join("") +
+    `<span><i style="background:${css("--load")}"></i>planned load (incl. flexible loads it schedules)</span>`;
   const cap = s.battery.cap_kwh;
-  const ys = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / cap);
-  add(sv, "path", { d: path(h.soc.map((v, i) => [x(i), ys(v)])), fill: "none", stroke: css("--soc"), "stroke-width": 2 });
-  add(sv, "text", { x: W - 2, y: pad.t + 8, "text-anchor": "end" }).textContent = "SoC";
-  // tariff peak band shading
-  $("#plan-legend").innerHTML = series.map(([, c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join("") +
-    `<span><i style="background:${css("--load")}"></i>planned load</span><span>‒ ‒ forecast demand (P50)</span><span><i style="background:${css("--soc")}"></i>battery (right axis, 0–${fmt(cap, 0)} kWh)</span>`;
+  chart($("#chart-soc"), {
+    n, ymax: cap, unit: " kWh", xlabel: (i) => clockOf(s.plan.step + i + 1),
+    lines: [{ label: "SoC", color: css("--soc"), vals: h.soc, width: 2 },
+            { label: "min", color: css("--bad"), vals: h.soc.map(() => 0.1 * cap), width: 1 }],
+    tip: (i) => tipRows(`${clockOf(s.plan.step + i + 1)}`, [[css("--soc"), "battery", `${fmt(h.soc[i])} kWh (${fmt(100 * h.soc[i] / cap, 0)}%)`]]),
+  });
   $("#plan-meta").textContent = `solved at ${clockOf(s.plan.step)} · ${s.plan.n_branches ? s.plan.n_branches + " outage branches · " : ""}forecaster: ${s.plan.forecaster}`;
 }
 
 function histChart(hh) {
-  const el = $("#chart-hist");
   if (!hh || !hh.k || hh.k.length < 2) return;
-  const W = Math.max(320, el.clientWidth), H = el.clientHeight || 180;
-  const sv = svg(el, W, H);
-  const n = hh.k.length, pad = { l: 34, r: 8, t: 8, b: 18 };
-  const ymax = Math.max(10, ...hh.load, ...hh.pv, ...hh.grid) * 1.1;
-  const x = (i) => pad.l + (W - pad.l - pad.r) * i / Math.max(1, n - 1);
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - Math.max(0, v) / ymax);
-  const xl = [];
-  for (let i = 0; i < n; i += Math.max(1, Math.round(n / 6))) xl.push([x(i), clockOf(hh.k[i])]);
-  axes(sv, W, H, pad, ymax, " kW", xl);
-  [["load", "--load"], ["pv", "--pv"], ["grid", "--grid"], ["dg", "--dg"]].forEach(([k, c]) =>
-    add(sv, "path", { d: path(hh[k].map((v, i) => [x(i), y(v)])), fill: "none", stroke: css(c), "stroke-width": k === "load" ? 1.8 : 1.3 }));
+  const n = hh.k.length;
+  const L = [["load", "Load served", "--load"], ["pv", "PV used", "--pv"], ["grid", "Grid", "--grid"], ["dg", "Diesel", "--dg"]];
+  const ymax = Math.ceil(Math.max(10, ...hh.load, ...hh.pv, ...hh.grid) * 1.1 / 10) * 10;
+  chart($("#chart-hist"), {
+    n, ymax, unit: " kW", xlabel: (i) => clockOf(hh.k[i]),
+    lines: L.map(([k, l, c]) => ({ label: l, color: css(c), vals: hh[k], width: k === "load" ? 2 : 1.5 })),
+    tip: (i) => tipRows(clockOf(hh.k[i]), [...L.map(([k, l, c]) => [css(c), l, fmt(hh[k][i]) + " kW"]),
+      ["", "battery", `${fmt(hh.soc[i])} kWh, ${hh.batt[i] >= 0 ? "out " + fmt(hh.batt[i]) : "in " + fmt(-hh.batt[i])} kW`]]),
+  });
 }
 
 // ---------------------------------------------------------------- proof
@@ -226,24 +258,22 @@ function forecastHtml(fc) {
 }
 
 function daysChart() {
-  const el = $("#chart-days");
-  const W = Math.max(320, el.clientWidth), H = el.clientHeight || 260;
-  const sv = svg(el, W, H);
-  const C = BENCH.controllers, r0 = 11;
+  const C = BENCH.controllers, r0 = BENCH.report_days ? BENCH.report_days[0] : 11;
   const days = {};
   C.forEach((c) => { days[c] = BENCH.per_day[c].filter((d) => d.day >= r0).sort((a, b) => a.seed - b.seed || a.day - b.day); });
   const ref = days.B1 || days[C[0]];
   const order = ref.map((_, i) => i).sort((a, b) => ref[a].total_cost_rs - ref[b].total_cost_rs);
-  const n = order.length, pad = { l: 46, r: 8, t: 8, b: 18 };
   const all = C.flatMap((c) => days[c].map((d) => d.total_cost_rs));
-  const ymin = Math.min(...all) * 0.95, ymax = Math.max(...all) * 1.02;
-  const x = (i) => pad.l + (W - pad.l - pad.r) * i / Math.max(1, n - 1);
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - ymin) / (ymax - ymin));
-  for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4; add(sv, "line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: "ax", "stroke-width": 0.5 }); add(sv, "text", { x: pad.l - 4, y: y(v) + 3, "text-anchor": "end" }).textContent = "₹" + Math.round(v / 1000) + "k"; }
-  add(sv, "text", { x: (W + pad.l) / 2, y: H - 4, "text-anchor": "middle" }).textContent = `${n} report scenario-days, sorted by B1 cost`;
-  const col = { B0: "--b0", B1: "--b1", GridQ: "--gq", Oracle: "--or" };
-  C.forEach((c) => add(sv, "path", { d: path(order.map((j, i) => [x(i), y(days[c][j].total_cost_rs)])), fill: "none", stroke: css(col[c]), "stroke-width": c === "GridQ" ? 2.2 : 1.3, "stroke-dasharray": c === "Oracle" ? "4 3" : "" }));
-  $("#days-legend").innerHTML = C.map((c) => `<span><i style="background:${css(col[c])}"></i>${c}${c === "Oracle" ? " (perfect foresight bound)" : ""}</span>`).join("");
+  const ymin = Math.floor(Math.min(...all) * 0.95 / 1000) * 1000, ymax = Math.ceil(Math.max(...all) * 1.02 / 1000) * 1000;
+  const col = { B0: css("--b0"), B1: css("--b1"), GridQ: css("--gq"), Oracle: css("--or") };
+  chart($("#chart-days"), {
+    n: order.length, ymin, ymax, unit: "", yfmt: (v) => "₹" + (v / 1000).toFixed(0) + "k", xlabel: (i) => (i === 0 ? "cheapest" : ""),
+    lines: C.map((c) => ({ label: c, color: col[c], vals: order.map((j) => days[c][j].total_cost_rs), width: c === "GridQ" ? 2.5 : 1.5, dash: c === "Oracle" ? "5 3" : "" })),
+    tip: (i) => { const j = order[i], d = ref[j]; return tipRows(`${d.date} · outage seed ${d.seed} · ${fmt(d.outage_steps / 4, 2)} h outage`,
+      C.map((c) => [col[c], c, rs(days[c][j].total_cost_rs)])); },
+  });
+  $("#days-legend").innerHTML = C.map((c) => `<span><i style="background:${col[c]}"></i>${c}${c === "Oracle" ? " (perfect-foresight bound, dashed)" : ""}</span>`).join("") +
+    `<span>x: ${order.length} report scenario-days, sorted by B1 cost</span>`;
 }
 
 // ---------------------------------------------------------------- replay
