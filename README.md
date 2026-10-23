@@ -86,8 +86,8 @@ flowchart LR
   end
   subgraph Q["Arduino UNO Q"]
     subgraph LNX["Linux side, Debian"]
-      IO["gridq-io, always on<br/>plant twin, dashboard, Bridge owner,<br/>brain supervisor"]
-      BR["gridq-brain, killable<br/>forecast, LP, explain<br/>heartbeat every 500 ms"]
+      IO["gridq-io, always on: plant twin, dashboard, Bridge owner, brain supervisor"]
+      BR["gridq-brain, killable: forecast, LP, explain, heartbeat every 500 ms"]
     end
     subgraph MCU["STM32U585 MCU, Zephyr"]
       WD["watchdog: no new heartbeat for 3 s = SAFE"]
@@ -98,10 +98,10 @@ flowchart LR
   IO -- "state" --> BR
   BR -- "plan, why, heartbeat" --> IO
   IO -- "Bridge msgpack-RPC" --- MCU
-  D3(["D3 grid sense"]) --> TRIP
-  TRIP --> RELAY(["D2 grid-tie relay, fail-safe"])
-  MCU --> UI(["LED matrix, LED3/4, buzzer"])
-  WEB(["Dashboard on phone or laptop"]) -- "HTTP + SSE" --- IO
+  D3["D3 grid sense"] --> TRIP
+  TRIP --> RELAY["D2 grid-tie relay, fail-safe"]
+  MCU --> UI["LED matrix, LED3/4, buzzer"]
+  WEB["Dashboard on phone or laptop"] -- "HTTP + SSE" --- IO
 ```
 
 - **The heartbeat comes only from the brain.** io forwards it as-is and never invents one, so killing the optimiser starves the MCU's watchdog for real. The MCU only counts a *new* value, so a hung process repeating itself doesn't keep it alive.
@@ -185,8 +185,8 @@ A plain MPC assumes the grid stays up, so it drains the battery at the evening p
 
 ```mermaid
 flowchart LR
-  N(["now, 18:00"]) --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["+24 h<br/>trunk: grid stays up, about 66 pct"]
-  A -. "2.2 pct" .-> A1["grid fails for 45 min or 2 h<br/>branch re-plans 10 h, then rejoins"]
+  N["now, 18:00"] --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["+24 h, trunk: grid stays up, about 66 pct"]
+  A -. "2.2 pct" .-> A1["grid fails for 45 min or 2 h, re-plans 10 h, rejoins"]
   B -. "4.2 pct" .-> B1["grid fails for 45 min or 2 h"]
   C -. "7.8 pct" .-> C1["grid fails for 45 min or 2 h"]
   D -. "13.6 pct" .-> D1["grid fails for 45 min or 2 h"]
