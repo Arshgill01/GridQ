@@ -374,10 +374,11 @@ function chart(box, spec) {
   const ymin = spec.ymin || 0, ymax = spec.ymax;
   const x = (i) => pad.l + (W - pad.l - pad.r) * i / Math.max(1, n - 1);
   const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - ymin) / (ymax - ymin));
-  for (let i = 0; i <= 4; i++) {
-    const v = ymin + (ymax - ymin) * i / 4;
+  const nt = spec.ticks || 4;
+  for (let i = 0; i <= nt; i++) {
+    const v = ymin + (ymax - ymin) * i / nt;
     el("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: i === 0 ? "ax0" : "ax", "stroke-width": 1 }, sv);
-    el("text", { x: pad.l - 6, y: y(v) + 3.5, "text-anchor": "end" }, sv, (spec.yfmt || ((u) => Math.round(u)))(v) + (i === 4 ? spec.unit : ""));
+    el("text", { x: pad.l - 6, y: y(v) + 3.5, "text-anchor": "end" }, sv, (spec.yfmt || ((u) => Math.round(u)))(v) + (i === nt ? spec.unit : ""));
   }
   const step = Math.max(1, Math.round(n / (W < 500 ? 4 : 8)));
   for (let i = 0; i < n; i += step) el("text", { x: x(i), y: H - 6, "text-anchor": i === 0 ? "start" : "middle" }, sv, spec.xlabel(i));
@@ -410,7 +411,8 @@ function chart(box, spec) {
 }
 const swatch = (c) => `<span class="sw" style="background:${c}"></span>`;
 const tipRows = (title, rows) => `<div class="t-h">${title}</div>` + rows.map(([c, l, v]) => `<div class="t-r"><span>${c ? swatch(c) : ""}${l}</span><span>${v}</span></div>`).join("");
-const niceMax = (v) => Math.ceil(v / 10) * 10;
+// 4 gridlines: pick a round step so every tick label is the exact value it marks
+const niceMax = (v) => 4 * [1, 2, 2.5, 5, 10, 15, 20, 25, 50, 100].find((st) => 4 * st >= v);
 
 function histChart(hh) {
   if (!hh || !hh.k || hh.k.length < 2) return;
@@ -448,7 +450,7 @@ function planChart(s) {
     `<span><i style="background:${css("--ink")}"></i>Planned load, incl. the flexible loads it schedules</span>`;
   const cap = s.battery.cap_kwh;
   chart($("#chart-soc"), {
-    n, ymax: cap, unit: " kWh", xlabel: (i) => clockOf(s.plan.step + i + 1),
+    n, ymax: cap, ticks: cap % 10 === 0 ? cap / 10 : 4, unit: " kWh", xlabel: (i) => clockOf(s.plan.step + i + 1),
     lines: [{ color: css("--batt"), vals: h.soc, width: 2.4 }, { color: css("--alarm"), vals: h.soc.map(() => 0.1 * cap), width: 1 }],
     tip: (i) => tipRows(clockOf(s.plan.step + i + 1), [[css("--batt"), "Battery", `${fmt(h.soc[i])} kWh · ${fmt(100 * h.soc[i] / cap, 0)}%`]]),
   });
@@ -543,7 +545,8 @@ function daysChart(col) {
   const ref = days.B1 || days[C[0]];
   const order = ref.map((_, i) => i).sort((a, b) => ref[a].total_cost_rs - ref[b].total_cost_rs);
   const all = C.flatMap((c) => days[c].map((d) => d.total_cost_rs));
-  const ymin = Math.floor(Math.min(...all) * 0.95 / 1000) * 1000, ymax = Math.ceil(Math.max(...all) * 1.02 / 1000) * 1000;
+  const ymin = Math.floor(Math.min(...all) * 0.95 / 1000) * 1000;
+  const ymax = ymin + 4000 * Math.ceil((Math.max(...all) * 1.02 - ymin) / 4000);   // whole ₹k per gridline
   chart($("#chart-days"), {
     n: order.length, ymin, ymax, unit: "", yfmt: (v) => "₹" + (v / 1000).toFixed(0) + "k", xlabel: (i) => (i === 0 ? "cheapest day for B1 →" : ""),
     lines: C.map((c) => ({ color: col[c], vals: order.map((j) => days[c][j].total_cost_rs), width: c === "GridQ" ? 2.6 : 1.4, dash: c === "Oracle" ? "5 4" : "" })),

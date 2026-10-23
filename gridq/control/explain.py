@@ -107,15 +107,24 @@ def battery_idle(p: dict, data: lp.LPData, res: lp.LPResult) -> dict | None:
             "lcd": f"Batt held +Rs{delta:.0f}"[:16]}
 
 
-def hedge_text(data: lp.LPData, res: lp.LPResult) -> dict | None:
-    """What the outage fan tree is buying: probability of an outage soon and its expected cost."""
+def hedge_text(data: lp.LPData, res: lp.LPResult, k: int) -> dict | None:
+    """What the outage fan tree is buying: probability of an outage soon (or, while islanded, of this
+    outage outlasting the trunk's optimistic restore time) and its expected cost."""
     if not data.branches:
         return None
-    prob = sum(b.weight for b in data.branches if b.tau <= 16)
     exp_cost = sum(b.weight * c for b, c in zip(data.branches, res.branch_cost))
-    return {"kind": "hedge", "prob_4h": prob, "text":
-            f"Outage risk in the next 4 h: {100 * prob:.0f}%. The plan keeps {res.trunk['soc'][0]:.0f} kWh in the "
-            f"battery, hedging against it.", "expected_outage_rs": exp_cost}
+    keep = res.trunk["soc"][0]
+    if data.grid_cap[0] <= 0:
+        prob = sum(b.weight for b in data.branches)
+        up = np.where(data.grid_cap > 0)[0]
+        when = hhmm(k + int(up[0])) if len(up) else "the end of the plan"
+        return {"kind": "hedge", "prob_longer": prob, "expected_outage_rs": exp_cost, "text":
+                f"Grid down. The plan allows a {100 * prob:.0f}% chance this outage lasts past {when} and keeps "
+                f"{keep:.0f} kWh in the battery for it."}
+    prob = sum(b.weight for b in data.branches if b.tau <= 16)
+    return {"kind": "hedge", "prob_4h": prob, "expected_outage_rs": exp_cost, "text":
+            f"Outage risk in the next 4 h: {100 * prob:.0f}%. The plan keeps {keep:.0f} kWh in the "
+            f"battery, hedging against it."}
 
 
 def explain(p: dict, data: lp.LPData, res: lp.LPResult, k: int, budget_ok: bool = True) -> list[dict]:
@@ -127,7 +136,7 @@ def explain(p: dict, data: lp.LPData, res: lp.LPResult, k: int, budget_ok: bool 
         b = battery_idle(p, data, res)
         if b and b["delta_rs"] > 1:
             items.append(b)
-    h = hedge_text(data, res)
+    h = hedge_text(data, res, k)
     if h:
         items.append(h)
     for b in res.binding:
