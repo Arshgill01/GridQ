@@ -1,0 +1,24 @@
+# Pins and polarity. Answers to spec §19 open items are recorded here as they are verified.
+unoq:
+  relay_pin: 2
+  relay_active_low: true       # VERIFY (§19.1); false if the BC547 inverter stage is used
+  grid_cable_pin: 3
+  buzzer_pin: 4
+  buzzer_type: active          # VERIFY (§19.2): active | passive (use tone())
+esp32:
+  sda: 21
+  scl: 22
+  servo_pin: 18
+  servo_min_deg: 10
+  servo_max_deg: 170
+  trig_pin: 5
+  echo_pin: 19
+  ev_threshold_cm: 12
+  ev_consecutive: 3
+  ev_cooldown_s: 10
+  lcd_addr: 0x27
+  sensor:
+    type: none                 # none | bh1750 | bmp280 | bme280
+    addr: 0x23
+web:
+  port: 8000

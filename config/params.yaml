@@ -1,0 +1,109 @@
+# GridQ plant + economics. FROZEN before any controller tuning (see DECISIONS.md).
+# Controller knobs live under `mpc:`; everything else describes the simulated plant.
+time:
+  step_minutes: 15
+  steps_per_day: 96
+  demo_start_hour: 16          # live demo starts at 16:00 to reach the evening peak fast
+
+site:
+  name: "Campus Block A"       # display name of the simulated block
+  # Weather is fetched for the I-BLEND campus (IIIT-Delhi) so that demand and
+  # solar come from the same place AND the same real days (spec used Chandigarh).
+  lat: 28.5459
+  lon: 77.2732
+
+grid:
+  import_limit_kw: 40
+  tariff_rs_per_kwh:           # India ToD structure (solar hours cheaper, peak dearer)
+    solar:  {from: 9,  to: 17, rate: 6.8}
+    peak:   {from: 18, to: 23, rate: 9.6}
+    normal: {rate: 8.0}
+  peak_charge_rs_per_kw: 15    # per calendar day, applied to that day's max import
+  emission_kg_per_kwh: 0.71
+
+solar:
+  kwp: 30
+  performance_ratio: 0.78
+
+battery:
+  capacity_kwh: 50
+  soc_min_frac: 0.10
+  soc_max_frac: 0.95
+  soc_init_frac: 0.60
+  p_charge_max_kw: 25
+  p_discharge_max_kw: 25
+  eta_charge: 0.95
+  eta_discharge: 0.95
+  wear_rs_per_kwh: 2.3         # applied to charge + discharge throughput
+
+diesel:
+  p_max_kw: 24
+  litres_per_kwh: 0.30
+  rs_per_litre: 90             # => 27 Rs/kWh
+  tank_litres: 100
+  co2_kg_per_litre: 2.68
+
+loads:                         # priority 1 = most critical
+  clinic:    {priority: 1, kind: inflexible, voll: 500}
+  pump:      {priority: 2, kind: flexible, p_kw: 7.5, energy_kwh: 22.5, window: [5, 20], b0_start: 6, b1_start: 10, slack_rs: 150}
+  hostel_a:  {priority: 3, kind: inflexible, voll: 40, fair: true}
+  hostel_b:  {priority: 3, kind: inflexible, voll: 40, fair: true}
+  academic:  {priority: 3, kind: inflexible, voll: 40, fair: true}
+  ev:        {priority: 4, kind: session, p_kw: 14.8, energy_kwh: 30, arrive: 20, deadline: 8, slack_rs: 60}
+  heater:    {priority: 5, kind: flexible, p_kw: 6, energy_kwh: 12, window: [22, 7], b0_start: 4, b1_start: 3, slack_rs: 30}
+
+shed_order_baseline: [heater, ev, academic, hostel_b, hostel_a, pump, clinic]  # fixed, no fairness
+
+clinic_model:                  # no public data: modelled, and the dashboard says so
+  base_kw: 3.5
+  day_extra_kw: 1.0
+  day_hours: [8, 20]
+  fridge_kw: 0.3
+  fridge_period_min: 30
+  noise_sd: 0.03
+
+data:
+  iblend_dir: data/iblend/raw
+  demand_csv: data/demand_15min.csv
+  solar_csv: data/solar_hourly.csv
+  meta_json: data/demand_meta.json
+  scale_to_p95_kw: {hostel_a: 20, hostel_b: 18, academic: 25}   # keep real shape, scale to our block size
+  min_day_coverage: 0.95       # drop days with >5% missing samples
+  test_days: 30                # last 30 good days = held-out benchmark days
+
+outages:
+  per_day_lambda: 1.5          # Poisson
+  start_hour_range: [6, 23]
+  duration_min_range: [20, 180]  # rounded to 15 min
+
+mpc:
+  horizon_steps: 96
+  terminal_value_rs_per_kwh: 6.0
+  reserve_mode: p90            # p90 (spec: fixed clinic reserve) | none
+  reserve_hours_clinic: 4
+  reserve_penalty_rs_per_kwh: 50
+  curtail_penalty_rs_per_kwh: 1.0
+  outage_assumed_remaining_steps: 4
+  solve_timeout_s: 3.0
+  fairness: burden             # burden (spec) | minmax | none
+  fairness_burden_per_hour: 1.0   # burden = 1 + shed_minutes/60
+  fairness_minmax_rs: 200      # Rs per unit of worst-off feeder shed share (minmax mode)
+  scenarios:                   # outage-aware fan tree (DECISIONS.md D3)
+    enabled: false
+    branch_starts: [1, 2, 4, 8, 16]    # steps ahead at which a branch's outage begins
+    durations_steps: [3, 8]            # outage lengths represented in each branch window
+    max_branch_steps: 40               # branch is modelled for this many steps after divergence
+
+bench:
+  days: 30
+  tune_days: [1, 10]
+  report_days: [11, 30]
+  seed_base: 1000
+  outage_seeds: 5              # each real day x 5 outage patterns = 150 scenario-days (100 on report days)
+  settle_rs_per_kwh: 6.0       # end-of-run battery energy settled at this rate (all controllers alike)
+
+safety:
+  heartbeat_timeout_ms: 3000
+  grid_reclose_delay_ms: 5000
+  brain_restart_delay_s: 12
+  safe_mask_loads: [clinic, pump]
