@@ -199,8 +199,14 @@ void netTask(void*) {
       else {
         failCount = failCount + 1;
         if (failCount >= 5) linkLost = true;
-        static unsigned long lastDisc = 0;
-        if (failCount >= 8 && millis() - lastDisc > 30000) {     // rediscover at most every 30 s
+        // "connected" but nothing answers: the radio link can stall silently on a phone hotspot, so
+        // rejoin first (cheap), then rediscover GridQ if it still isn't answering
+        static unsigned long lastRejoin = 0, lastDisc = 0;
+        if (failCount >= 8 && (lastRejoin == 0 || millis() - lastRejoin > 60000)) {
+          lastRejoin = millis();
+          Serial.println("GridQ not answering: rejoining Wi-Fi");
+          WiFi.disconnect(); WiFi.begin(WIFI_SSID, WIFI_PASS);
+        } else if (failCount >= 16 && millis() - lastDisc > 30000) {     // rediscover at most every 30 s
           lastDisc = millis();
           Serial.println("GridQ not answering: discovering...");
           if (discover()) { Serial.printf("found GridQ at %s\n", gridqHost.c_str()); failCount = 0; }
@@ -244,6 +250,7 @@ void setup() {
   servo.attach(PIN_SERVO, 500, 2400);
   servo.write((int)servoPos);
   WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);                // modem sleep makes the link stall silently on phone hotspots
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   xTaskCreatePinnedToCore(netTask, "net", 8192, nullptr, 1, nullptr, 0);
