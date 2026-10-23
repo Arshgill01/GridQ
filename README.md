@@ -234,7 +234,7 @@ What we don't hide:
 
 <p align="center">
   <img alt="ESP32 clinic node: 16x2 LCD reading GRID OK 09:45 and Rs6.8/kWh now, with the SG90 servo battery gauge mounted beside it" src="docs/img/esp32-node.jpg" width="49%">
-  <img alt="Arduino UNO Q: the 8x13 LED matrix showing the load and source bars, with the grid-tie relay module and buzzer on the breadboard" src="docs/img/unoq.jpg" width="44%">
+  <img alt="Arduino UNO Q: the 8x13 LED matrix showing the load and source bars, with the grid-tie relay module and buzzer on the breadboard" src="docs/img/unoq.jpg" width="49%">
 </p>
 
 <sub>Left: the clinic node, with the LCD showing the price of energy the LP computed and the servo gauge tracking the battery. Right: the UNO Q, with the LED matrix mimicking the microgrid (loads bright, sources dim) next to the grid-tie relay and the alarm buzzer.</sub>
