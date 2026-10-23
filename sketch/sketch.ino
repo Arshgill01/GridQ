@@ -179,7 +179,17 @@ void drawFrame(unsigned long now) {
   } else if (mode == MODE_SAFE) {
     for (int b = 0; b < 7; b++) bar(b, (safeMask >> b & 1) ? 8 : 0, 7);
   } else {
-    for (int c = 0; c < 12; c++) bar(c, cols[c], 7);
+    // loads (columns 0-6, column n = mask bit n) bright; sources (8-11) dimmer so the two groups read apart.
+    // A load the plan holds back (mask bit off) flashes a dim ghost bar; a trimmed feeder's bar pulses.
+    bool blinkOn = (now / 300) % 2 == 0;
+    for (int c = 0; c < 7; c++) {
+      bool cut = !(planMask >> c & 1);
+      bool feeder = c == 0 || c == 2 || c == 3 || c == 4;
+      if (cut) bar(c, 8, blinkOn ? 2 : 0);
+      else if (feeder && cols[c] > 0 && cols[c] < 8) bar(c, cols[c], blinkOn ? 7 : 2);
+      else bar(c, cols[c], 7);
+    }
+    for (int c = 8; c < 12; c++) bar(c, cols[c], 3);
     bar(12, hbPulse ? 8 : 0, 4);
   }
   if (memcmp(frame, lastFrame, sizeof(frame)) != 0) {
