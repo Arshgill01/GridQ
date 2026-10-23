@@ -82,8 +82,8 @@ outages:
 
 mpc:
   horizon_steps: 96
-  terminal_value_rs_per_kwh: 6.0
-  reserve_mode: p90            # p90 (spec: fixed clinic reserve) | none
+  terminal_value_rs_per_kwh: 8.0   # = normal tariff: stored energy is worth what it costs to buy back (D3, tuned)
+  reserve_mode: none           # none (fan tree hedges outages, D3) | p90 (spec fixed clinic reserve) | p90_release
   reserve_hours_clinic: 4
   reserve_penalty_rs_per_kwh: 50
   curtail_penalty_rs_per_kwh: 1.0
@@ -93,7 +93,7 @@ mpc:
   fairness_burden_per_hour: 1.0   # burden = 1 + shed_minutes/60
   fairness_minmax_rs: 200      # Rs per unit of worst-off feeder shed share (minmax mode)
   scenarios:                   # outage-aware fan tree (DECISIONS.md D3)
-    enabled: false
+    enabled: true
     branch_starts: [1, 2, 4, 8, 16]    # steps ahead at which a branch's outage begins
     durations_steps: [3, 8]            # outage lengths represented in each branch window
     max_branch_steps: 40               # branch is modelled for this many steps after divergence

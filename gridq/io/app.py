@@ -657,6 +657,19 @@ def api_bench():
     return FileResponse(f, media_type="application/json")
 
 
+@app.get("/api/tune")
+def api_tune():
+    f = ROOT / "data" / "bench" / "tune.json"
+    if not f.exists():
+        return J({"error": "no tune.json: run python tools/tune.py"}, 404)
+    t = json.loads(f.read_text())
+    b1, orc = t["B1"]["total_cost_rs"]["sum"], t["Oracle"]["total_cost_rs"]["sum"]
+    rows = [{"name": n, "total_cost_rs": v["summary"]["total_cost_rs"]["sum"], "captured_pct": v["captured_pct"],
+             "unserved_kwh": v["summary"]["unserved_kwh_total"]["sum"], "wear_rs": v["summary"]["battery_wear_rs"]["sum"],
+             "solve_ms": v["extra"]["solve_ms_median"]} for n, v in t["variants"].items()]
+    return J({"b1": b1, "oracle": orc, "rows": rows, "n": t["B1"]["total_cost_rs"]["n"]})
+
+
 @app.get("/api/meta")
 def api_meta():
     f = ROOT / P["data"]["meta_json"]

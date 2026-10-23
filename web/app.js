@@ -239,6 +239,7 @@ async function loadProof() {
   html += `<tr><td>LP solve ms (median / p95)</td>` + C.map((c) => `<td class="num">${ex[c].solve_ms_median != null ? fmt(ex[c].solve_ms_median, 0) + " / " + fmt(ex[c].solve_ms_p95, 0) : "—"}</td>`).join("") + "</tr>";
   $("#proof-table").innerHTML = html;
   daysChart();
+  tuneTable();
   const w = BENCH.worst_gridq;
   const fc = META && META.forecast;
   $("#forecast-card").innerHTML = fc ? forecastHtml(fc) : "<span class='muted'>No trained forecaster (seasonal-naive in use).</span>";
@@ -247,6 +248,17 @@ async function loadProof() {
     `${R.GridQ.total_cost_rs.n} report scenario-days (held-out days 11–${BENCH.meta.n_days} × ${BENCH.meta.seeds} outage seeds; days 1–10 used for tuning only) · method after Panda et al. 2024 · ` +
     `worst GridQ day: ${w ? `${w.date} seed ${w.seed}, ${rs(w.total_cost_rs)} (${w.outage_steps / 4} h outage)` : "—"} · git ${BENCH.meta.git} · params ${BENCH.meta.params_hash} · ${BENCH.meta.date}` +
     (BENCH.meta.fallback && BENCH.meta.fallback.demand ? `<div class="flag">⚠ benchmark ran on SYNTHETIC demand</div>` : "");
+}
+
+async function tuneTable() {
+  let t;
+  try { const r = await fetch("/api/tune"); if (!r.ok) return; t = await r.json(); } catch (e) { return; }
+  let h = `<tr><th>GridQ variant</th><th>total ₹ (${t.n} days)</th><th>captured</th><th>unserved kWh</th><th>wear ₹</th><th>LP ms</th></tr>`;
+  h += `<tr><td>B1 smart rules (reference)</td><td class="num">${rs(t.b1)}</td><td class="num">0%</td><td></td><td></td><td></td></tr>`;
+  t.rows.forEach((r) => { h += `<tr${r.name === "fan tree" ? ' class="gq"' : ""}><td>${r.name}${r.name === "fan tree" ? " ✔ chosen" : ""}</td><td class="num">${rs(r.total_cost_rs)}</td>` +
+    `<td class="num">${fmt(r.captured_pct, 1)}%</td><td class="num">${fmt(r.unserved_kwh, 0)}</td><td class="num">${rs(r.wear_rs)}</td><td class="num">${fmt(r.solve_ms, 0)}</td></tr>`; });
+  h += `<tr><td>Oracle (perfect foresight)</td><td class="num">${rs(t.oracle)}</td><td class="num">100%</td><td></td><td></td><td></td></tr>`;
+  $("#tune-table").innerHTML = h;
 }
 
 function forecastHtml(fc) {
