@@ -22,3 +22,15 @@ esp32:
     addr: 0x23
 web:
   port: 8000
+
+# Verified on our board (2026-10-23):
+board:
+  os: "Debian 13 trixie, aarch64, 4 cores, 3.6 GB RAM"
+  app_lab: "arduino-app-cli 0.7.0, zephyr core 0.52.0, Arduino_RouterBridge 0.2.2, python-apps-base 0.5.0 (Python 3.13.9)"
+  bridge_api: "MCU Bridge.begin()/provide_safe(name, fn) with String args; Linux: msgpack-rpc over /var/run/arduino-router.sock (works)"
+  rgb_led_pins: "LED3_R/G/B, LED4_R/G/B, active-LOW"
+  matrix_api: "Arduino_LED_Matrix: begin(), setGrayscaleBits(3), draw(uint8_t[104]) row-major 8x13"
+  port_8000: "declared in app.yaml ports; listening on 0.0.0.0 (hotspot 'POCO M4 Pro', board IP 10.215.158.1)"
+  lp_solve_ms: "fan-tree MPC 65-69 ms per step on the board (M1 laptop: 48 ms)"
+  brain_cold_start_s: 13.5
+  sketch: "23 KB flash, 5 KB RAM"

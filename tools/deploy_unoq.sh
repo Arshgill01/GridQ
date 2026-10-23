@@ -8,7 +8,7 @@ OUT=build/gridq-app
 rm -rf "$OUT" && mkdir -p "$OUT/python" "$OUT/sketch"
 cp deploy/app.yaml "$OUT/"
 cp deploy/main.py "$OUT/python/main.py"
-grep -v -E '^(numpy|pandas|PyYAML|fastapi|uvicorn|msgpack)==' requirements.txt > "$OUT/python/requirements.txt"   # already in the base image
+grep -v -E '^(pandas|PyYAML|fastapi|uvicorn|msgpack)==' requirements.txt > "$OUT/python/requirements.txt"   # already in the base image
 rsync -a --exclude __pycache__ gridq config web "$OUT/python/"
 mkdir -p "$OUT/python/data"
 for f in demand_15min.csv demand_meta.json solar_hourly.csv; do [ -f "data/$f" ] && cp "data/$f" "$OUT/python/data/"; done
