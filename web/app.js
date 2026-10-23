@@ -72,12 +72,23 @@ $$("#folds button").forEach((b) => b.addEventListener("click", () => {
   FOLD = b.dataset.fold; $$("#folds button").forEach((x) => x.classList.toggle("on", x === b)); loadProof();
 }));
 
+// A browser allows ~6 open connections per address, and each tab's stream holds one. Background tabs
+// let go of theirs, so a pile of old tabs can't leave a new one hanging or frozen.
+let ES = null;
 function connect() {
-  const es = new EventSource("/api/stream");
+  if (ES || document.hidden) return;
+  const es = ES = new EventSource("/api/stream");
   es.addEventListener("state", (e) => { S = JSON.parse(e.data); render(S); });
-  es.onerror = () => { es.close(); ANN.linkLost = true; if (S) renderAnn(S); setTimeout(connect, 1500); };
+  es.onerror = () => {
+    es.close(); if (ES === es) ES = null;
+    ANN.linkLost = true; if (S) renderAnn(S); setTimeout(connect, 1500);
+  };
   es.onopen = () => { ANN.linkLost = false; };
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { if (ES) { ES.close(); ES = null; } }
+  else connect();
+});
 
 // ---------------------------------------------------------------- annunciator
 const WINS = [
