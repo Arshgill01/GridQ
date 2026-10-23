@@ -66,12 +66,18 @@ def counterfactuals(p: dict, data: lp.LPData, res: lp.LPResult, k: int, max_item
             item.update(deadline=hhmm(dl), finishes=hhmm(k + fin) if fin else None, deadline_met=met)
             dtxt = f"Deadline {hhmm(dl)} still met (finishes {hhmm(k + fin)})." if met else \
                 f"Deadline {hhmm(dl)} at risk."
-            cost = f"costs Rs {delta:,.0f} more" if delta is not None else "is not feasible"
+            if delta is None:
+                cost = "is not feasible"
+            elif delta < 0.5:      # LP indifferent: several slots are equally cheap
+                cost = "would cost the same (Rs 0): later slots are just as cheap, so it waits"
+                delta = 0.0
+            else:
+                cost = f"costs Rs {delta:,.0f} more"
             item["text"] = f"{NAMES[name]} paused. Running it now {cost}. {dtxt}"
-            item["lcd"] = f"{SHORT[name]} paused +Rs{delta:.0f}" if delta is not None else f"{SHORT[name]} paused"
+            item["lcd"] = f"{SHORT[name]} paused +Rs{delta:.0f}" if delta else f"{SHORT[name]} paused"
         else:
             pct = 100 * tr[f"shed_{name}"][0] / max(data.dem[name][0], 1e-6)
-            cost = f"would cost Rs {delta:,.0f} more" if delta is not None else "is not physically possible right now"
+            cost = (f"would cost Rs {max(delta, 0):,.0f} more" if delta is not None else "is not physically possible right now")
             item["text"] = f"{NAMES[name]} trimmed {pct:.0f}%. Keeping it fully on {cost}."
             item["lcd"] = f"{SHORT[name]} -{pct:.0f}%"
         item["lcd"] = item["lcd"][:16]

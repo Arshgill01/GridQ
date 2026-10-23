@@ -44,7 +44,7 @@ HW = load_hardware()
 T = P["mpc"]["horizon_steps"]
 SAFE_MASK = mask_from_loads(P["safety"]["safe_mask_loads"])
 PORT = int(os.environ.get("GRIDQ_PORT", HW["web"]["port"]))
-LIVE_DAYS = 14
+LIVE_DAYS = 90          # held-out days cycled; ~2.4 h of wall time at 1x before the live run restarts itself
 
 
 # ------------------------------------------------------------------ brain supervisor
@@ -214,8 +214,10 @@ class Live:
     def tick(self):
         with self.lock:
             tw = self.twin
-            if tw.k >= tw.tl.n_steps:
-                return
+            if tw.k >= tw.tl.n_steps - 1:      # end of the live timeline: start a fresh session (logged)
+                log.warning("live timeline exhausted at step %d: auto-reset", tw.k)
+                self.reset()
+                tw = self.twin
             # 1. MCU status
             try:
                 self.status = self.bridge.get_status()
