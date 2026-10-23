@@ -119,7 +119,8 @@ void netTask(void*) {
     if (WiFi.status() != WL_CONNECTED) {
       failCount = failCount + 1;
       if (failCount >= 5) linkLost = true;
-      WiFi.reconnect();
+      static unsigned long lastRetry = 0;          // let a connection attempt finish before retrying
+      if (millis() - lastRetry > 8000) { lastRetry = millis(); WiFi.disconnect(); WiFi.begin(WIFI_SSID, WIFI_PASS); }
       vTaskDelay(pdMS_TO_TICKS(1000));
       continue;
     }
@@ -224,7 +225,10 @@ void loop() {
     digitalWrite(PIN_TRIG, HIGH); delayMicroseconds(10); digitalWrite(PIN_TRIG, LOW);
     unsigned long us = pulseIn(PIN_ECHO, HIGH, 30000);
     float cm = us ? us / 58.0f : 999.0f;
-    if (cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; evArmed = true; }
+    bool valid = cm >= 2.0f;                       // HC-SR04 minimum range: shorter echoes are noise/wiring
+    static unsigned long tDbg = 0;
+    if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d link=%s\n", us, cm, valid ? "" : "(invalid)", WiFi.status(), linkLost ? "LOST" : "ok"); }
+    if (valid && cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; if (valid) evArmed = true; }
     if (evStreak >= EV_CONSECUTIVE && evArmed && now - lastEv >= EV_COOLDOWN_MS) {
       evArmed = false;      // rising edge only: re-arms when the bay clears
       lastEv = now;
