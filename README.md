@@ -230,9 +230,14 @@ What we don't hide:
 
 ## Hardware
 
-<!-- HARDWARE PHOTO: save a photo of the rig as docs/img/rig.jpg, then uncomment:
-<p align="center"><img alt="The GridQ rig: Arduino UNO Q with relay and buzzer, ESP32 clinic node with LCD, servo gauge and ultrasonic sensor" src="docs/img/rig.jpg" width="820"></p>
--->
+<p align="center"><img alt="The GridQ rig: the ESP32 clinic node with its LCD showing GRID OK and 'Pump paused +Rs2', the Arduino UNO Q with its blue LED-matrix bar chart and the relay board, and the live dashboard on the laptop behind" src="docs/img/rig.jpg" width="880"></p>
+
+<p align="center">
+  <img alt="ESP32 clinic node: 16x2 LCD reading GRID OK 09:45 and Rs6.8/kWh now, with the SG90 servo battery gauge mounted beside it" src="docs/img/esp32-node.jpg" width="49%">
+  <img alt="Arduino UNO Q: the 8x13 LED matrix showing the load and source bars, with the grid-tie relay module and buzzer on the breadboard" src="docs/img/unoq.jpg" width="44%">
+</p>
+
+<sub>Left: the clinic node, with the LCD showing the price of energy the LP computed and the servo gauge tracking the battery. Right: the UNO Q, with the LED matrix mimicking the microgrid (loads bright, sources dim) next to the grid-tie relay and the alarm buzzer.</sub>
 
 | Part | Role |
 |---|---|
