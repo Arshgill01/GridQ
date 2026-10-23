@@ -79,29 +79,29 @@ One rule organises the system: **whatever can crash is not in charge of safety.*
 
 ```mermaid
 flowchart LR
-  subgraph ESP["ESP32 · clinic node"]
-    LCD["16×2 LCD<br/>grid status · secure hours"]
-    SRV["servo<br/>battery gauge"]
-    US["HC-SR04<br/>EV fleet sensor"]
+  subgraph ESP["ESP32 clinic node"]
+    LCD["16x2 LCD: grid status, secure hours"]
+    SRV["servo: battery gauge"]
+    US["HC-SR04: EV fleet sensor"]
   end
   subgraph Q["Arduino UNO Q"]
-    subgraph LNX["Linux side · Debian"]
-      IO["gridq-io · always on<br/>plant twin · dashboard + SSE<br/>sole Bridge owner · brain supervisor"]
-      BR["gridq-brain · killable<br/>forecast → LP → explain<br/>heartbeat every 500 ms"]
+    subgraph LNX["Linux side, Debian"]
+      IO["gridq-io, always on<br/>plant twin, dashboard, Bridge owner,<br/>brain supervisor"]
+      BR["gridq-brain, killable<br/>forecast, LP, explain<br/>heartbeat every 500 ms"]
     end
-    subgraph MCU["STM32U585 MCU · Zephyr"]
-      WD["watchdog: no new heartbeat 3 s → SAFE"]
-      TRIP["local grid trip · reclose after 5 s"]
+    subgraph MCU["STM32U585 MCU, Zephyr"]
+      WD["watchdog: no new heartbeat for 3 s = SAFE"]
+      TRIP["local grid trip, reclose after 5 s"]
     end
   end
-  ESP <-->|"Wi-Fi · HTTP, 1 Hz"| IO
-  IO -->|"state (long-poll)"| BR
-  BR -->|"plan · why · heartbeat"| IO
-  IO <-->|"Bridge · msgpack-RPC<br/>hb · set_outputs · get_status"| MCU
-  D3(["D3 · grid sense"]) --> TRIP
-  TRIP --> RELAY(["D2 · grid-tie relay, fail-safe"])
-  MCU --> UI(["8×13 LED matrix · LED3/4 · buzzer"])
-  WEB(["Dashboard · phone or laptop"]) <-->|"HTTP + SSE"| IO
+  ESP -- "Wi-Fi, HTTP 1 Hz" --- IO
+  IO -- "state" --> BR
+  BR -- "plan, why, heartbeat" --> IO
+  IO -- "Bridge msgpack-RPC" --- MCU
+  D3(["D3 grid sense"]) --> TRIP
+  TRIP --> RELAY(["D2 grid-tie relay, fail-safe"])
+  MCU --> UI(["LED matrix, LED3/4, buzzer"])
+  WEB(["Dashboard on phone or laptop"]) -- "HTTP + SSE" --- IO
 ```
 
 - **The heartbeat comes only from the brain.** io forwards it as-is and never invents one, so killing the optimiser starves the MCU's watchdog for real. The MCU only counts a *new* value, so a hung process repeating itself doesn't keep it alive.
@@ -155,16 +155,16 @@ Every option has a price in rupees per kWh. The LP chooses the cheapest 24-hour 
 Every step, over a 24 h horizon of 96 quarter-hours ($\Delta t = 0.25$ h), GridQ solves:
 
 $$
-\min \sum_{t=0}^{95} w_t\,\Delta t \Big[\, c_t\, g_t + \kappa\,(b^+_t + b^-_t) + c_{\mathrm{dg}}\, d_t + \epsilon\, u_t + \sum_{\ell} \mathrm{VoLL}_\ell\, \beta_\ell\, x_{\ell,t} \Big] \;+\; \pi \sum_{\mathrm{day}} P_{\mathrm{day}} \;+\; \sum_s \sigma_s\, m_s \;-\; V\, E_{T}
+\min \sum_{t=0}^{95} w_t \Delta t \Big[ c_t  g_t + \kappa (b^+_t + b^-_t) + c_{\mathrm{dg}}  d_t + \epsilon  u_t + \sum_{\ell} \mathrm{VoLL}_\ell  \beta_\ell  x_{\ell,t} \Big] \quad + \quad \pi \sum_{\mathrm{day}} P_{\mathrm{day}} \quad + \quad \sum_s \sigma_s  m_s \quad - \quad V  E_{T}
 $$
 
 $$
 \begin{aligned}
-& \mathrm{PV}_t - u_t + g_t + d_t + b^-_t - b^+_t \;=\; \textstyle\sum_\ell \big(D_{\ell,t} - x_{\ell,t}\big) + \sum_s p_{s,t} && \text{energy balance (its dual is the price of energy now)} \\
-& E_{t+1} = E_t + \eta\,\Delta t\, b^+_t - \Delta t\, b^-_t / \eta && \text{battery, } \eta = 0.95,\ 5 \le E \le 47.5\text{ kWh} \\
+& \mathrm{PV}_t - u_t + g_t + d_t + b^-_t - b^+_t  =  \textstyle\sum_\ell \big(D_{\ell,t} - x_{\ell,t}\big) + \sum_s p_{s,t} && \text{energy balance (its dual is the price of energy now)} \\
+& E_{t+1} = E_t + \eta \Delta t  b^+_t - \Delta t  b^-_t / \eta && \text{battery, } \eta = 0.95,\ 5 \le E \le 47.5\text{ kWh} \\
 & 0 \le g_t \le G_t, \qquad g_t \le P_{\mathrm{day}(t)} && G_t = 40\text{ kW, or } 0 \text{ when islanded} \\
-& \textstyle\sum_{t \in \mathrm{day}} 0.30\,\Delta t\, d_t \le \mathrm{tank}_{\mathrm{day}} && \text{fuel} \\
-& \textstyle\sum_t \Delta t\, p_{s,t} + m_s \ge R_s && \text{deadlines: EV 30 kWh by 08:00, pump 22.5 kWh, heater 12 kWh}
+& \textstyle\sum_{t \in \mathrm{day}} 0.30 \Delta t  d_t \le \mathrm{tank}_{\mathrm{day}} && \text{fuel} \\
+& \textstyle\sum_t \Delta t  p_{s,t} + m_s \ge R_s && \text{EV, pump, heater deadlines}
 \end{aligned}
 $$
 
@@ -185,12 +185,12 @@ A plain MPC assumes the grid stays up, so it drains the battery at the evening p
 
 ```mermaid
 flowchart LR
-  N(["now · 18:00"]) --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["… +24 h<br/>trunk: grid stays up · ≈66%"]
-  A -.->|"2.2%"| A1["grid fails: 45 min or 2 h<br/>branch re-plans 10 h, then rejoins"]
-  B -.->|"4.2%"| B1["grid fails: 45 min or 2 h"]
-  C -.->|"7.8%"| C1["grid fails: 45 min or 2 h"]
-  D -.->|"13.6%"| D1["grid fails: 45 min or 2 h"]
-  E -.->|"6.0%"| E1["grid fails: 45 min or 2 h"]
+  N(["now, 18:00"]) --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["+24 h<br/>trunk: grid stays up, about 66 pct"]
+  A -. "2.2 pct" .-> A1["grid fails for 45 min or 2 h<br/>branch re-plans 10 h, then rejoins"]
+  B -. "4.2 pct" .-> B1["grid fails for 45 min or 2 h"]
+  C -. "7.8 pct" .-> C1["grid fails for 45 min or 2 h"]
+  D -. "13.6 pct" .-> D1["grid fails for 45 min or 2 h"]
+  E -. "6.0 pct" .-> E1["grid fails for 45 min or 2 h"]
 ```
 
 <sub>Weights from a real 18:00 solve.</sub>
@@ -225,7 +225,7 @@ Every line in the dispatcher log and on the clinic LCD is computed from the LP:
 | Battery held | Re-solve with 10 kW forced discharge | *Battery holding 30 kWh. Discharging 10 kW now would cost ₹14 more over the plan.* |
 | Clinic secure | Clinic-only P90 demand on forecast solar + battery (+ diesel) | `SECURE 7h30m` · `+DIESEL >48h` |
 
-Why it doesn't buy at ₹6.8 and discharge at the ₹9.6 peak: by the time it's delivered, that kWh costs $6.8/0.95^2 + 2.3\,(1/0.95^2 + 1) \approx 12.4$ ₹/kWh, which is more than 9.6. **Grid arbitrage never pays at these prices, and the LP knows it.** B1 does it anyway and pays in wear. The battery earns its keep from solar shifting, the 40 kW cap, the demand charge and, above all, outages.
+Why it doesn't buy at ₹6.8 and discharge at the ₹9.6 peak: by the time it's delivered, that kWh costs $6.8/0.95^2 + 2.3 (1/0.95^2 + 1) \approx 12.4$ ₹/kWh, which is more than 9.6. **Grid arbitrage never pays at these prices, and the LP knows it.** B1 does it anyway and pays in wear. The battery earns its keep from solar shifting, the 40 kW cap, the demand charge and, above all, outages.
 
 ### The forecaster
 
