@@ -1,0 +1,7 @@
+flowchart TB
+  N(["now · 18:00"]) --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["… +24 h · trunk: grid stays up · ≈66%"]
+  A -.->|"2.2%"| A1["grid fails · 45 min or 2 h<br/>branch re-plans 10 h, then rejoins"]
+  B -.->|"4.2%"| B1["grid fails · 45 min or 2 h"]
+  C -.->|"7.8%"| C1["grid fails · 45 min or 2 h"]
+  D -.->|"13.6%"| D1["grid fails · 45 min or 2 h"]
+  E -.->|"6.0%"| E1["grid fails · 45 min or 2 h"]

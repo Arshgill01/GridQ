@@ -1,0 +1,20 @@
+flowchart TB
+  ESP["ESP32 clinic node<br/>16×2 LCD · servo battery gauge<br/>HC-SR04 EV fleet sensor"]
+  subgraph Q["Arduino UNO Q"]
+    subgraph LNX["Linux side · Debian"]
+      IO["gridq-io · always on<br/>plant twin · dashboard + SSE<br/>sole Bridge owner · brain supervisor"]
+      BR["gridq-brain · killable<br/>forecast → LP → explain<br/>heartbeat every 500 ms"]
+    end
+    subgraph MCU["STM32U585 MCU · Zephyr"]
+      WD["watchdog<br/>no new heartbeat for 3 s → SAFE"]
+      TRIP["local grid trip<br/>reclose after 5 s"]
+    end
+  end
+  ESP <-->|"Wi-Fi · HTTP 1 Hz"| IO
+  IO -->|"state"| BR
+  BR -->|"plan · why · heartbeat"| IO
+  IO <-->|"Bridge · msgpack-RPC"| MCU
+  D3(["D3 · grid sense"]) --> TRIP
+  TRIP --> RELAY(["D2 · grid-tie relay, fail-safe"])
+  MCU --> UI(["LED matrix · LED3/4 · buzzer"])
+  WEB(["Dashboard · phone or laptop"]) <-->|"HTTP + SSE"| IO

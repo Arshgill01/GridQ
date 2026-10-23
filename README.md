@@ -77,32 +77,10 @@ Every button on the dashboard's *Break it* console is a real fault injection. Th
 
 One rule organises the system: **whatever can crash is not in charge of safety.**
 
-```mermaid
-flowchart LR
-  subgraph ESP["ESP32 clinic node"]
-    LCD["16x2 LCD: grid status, secure hours"]
-    SRV["servo: battery gauge"]
-    US["HC-SR04: EV fleet sensor"]
-  end
-  subgraph Q["Arduino UNO Q"]
-    subgraph LNX["Linux side, Debian"]
-      IO["gridq-io, always on: plant twin, dashboard, Bridge owner, brain supervisor"]
-      BR["gridq-brain, killable: forecast, LP, explain, heartbeat every 500 ms"]
-    end
-    subgraph MCU["STM32U585 MCU, Zephyr"]
-      WD["watchdog: no new heartbeat for 3 s = SAFE"]
-      TRIP["local grid trip, reclose after 5 s"]
-    end
-  end
-  ESP -- "Wi-Fi, HTTP 1 Hz" --- IO
-  IO -- "state" --> BR
-  BR -- "plan, why, heartbeat" --> IO
-  IO -- "Bridge msgpack-RPC" --- MCU
-  D3["D3 grid sense"] --> TRIP
-  TRIP --> RELAY["D2 grid-tie relay, fail-safe"]
-  MCU --> UI["LED matrix, LED3/4, buzzer"]
-  WEB["Dashboard on phone or laptop"] -- "HTTP + SSE" --- IO
-```
+<p align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.svg">
+  <img alt="Architecture: the ESP32 clinic node and the dashboard talk to gridq-io over Wi-Fi. gridq-io supervises the killable gridq-brain and owns the Bridge to the STM32 MCU. The MCU runs the watchdog and the local grid trip from D3, and drives the D2 relay, LED matrix and buzzer." src="docs/img/architecture-light.svg" width="900">
+</picture></p>
 
 - **The heartbeat comes only from the brain.** io forwards it as-is and never invents one, so killing the optimiser starves the MCU's watchdog for real. The MCU only counts a *new* value, so a hung process repeating itself doesn't keep it alive.
 - **The grid trip is local.** D3 is read on the MCU and the relay is driven by the MCU. Linux can freeze and the site still islands safely.
@@ -183,17 +161,12 @@ Here $g$ is grid import, $b^\pm$ is battery charge/discharge, $d$ is diesel, $u$
 
 A plain MPC assumes the grid stays up, so it drains the battery at the evening peak, exactly when an outage hurts most. GridQ's LP solves a **trunk** (the grid stays up) together with **10 branches** (the grid fails at +15 min, 30 min, 1 h, 2 h or 4 h, for 45 min or 2 h). Each branch is weighted by the probability that the first outage starts in its window:
 
-```mermaid
-flowchart LR
-  N["now, 18:00"] --> A["+15 min"] --> B["+30 min"] --> C["+1 h"] --> D["+2 h"] --> E["+4 h"] --> F["+24 h, trunk: grid stays up, about 66 pct"]
-  A -. "2.2 pct" .-> A1["grid fails for 45 min or 2 h, re-plans 10 h, rejoins"]
-  B -. "4.2 pct" .-> B1["grid fails for 45 min or 2 h"]
-  C -. "7.8 pct" .-> C1["grid fails for 45 min or 2 h"]
-  D -. "13.6 pct" .-> D1["grid fails for 45 min or 2 h"]
-  E -. "6.0 pct" .-> E1["grid fails for 45 min or 2 h"]
-```
+<p align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/fan-tree-dark.svg">
+  <img alt="Fan tree: a trunk where the grid stays up (about 66%), with branches where the grid fails at +15 min (2.2%), +30 min (4.2%), +1 h (7.8%), +2 h (13.6%) and +4 h (6.0%), each for 45 min or 2 h." src="docs/img/fan-tree-light.svg" width="560">
+</picture></p>
 
-<sub>Weights from a real 18:00 solve.</sub>
+<sub>Weights from a real 18:00 solve. Diagram sources are in [`docs/diagrams/`](docs/diagrams); re-render with `tools/render_diagrams.py`.</sub>
 
 - **Non-anticipativity.** A branch must share every decision with the trunk until its outage starts, because the controller can't know it's coming. So the action applied *now* is a hedge that works in every branch.
 - **Weights come from outage statistics, never the realised schedule.** A real site would estimate the same numbers from its outage log.
