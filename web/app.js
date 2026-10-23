@@ -9,6 +9,7 @@ const fmt = (x, d = 1) => (x == null || Number.isNaN(x) ? "—" : Number(x).toFi
 const rs = (x) => (x == null ? "—" : "₹" + Math.round(x).toLocaleString("en-IN"));
 let S = null;
 let BENCH = null;
+let FOLD = "winter";
 let META = null;
 
 // ---------------------------------------------------------------- tabs
@@ -36,6 +37,9 @@ $$("#speeds button").forEach((b) => b.addEventListener("click", () => post("/api
 $("#t-sky").addEventListener("change", (e) => post("/api/live/sky", { enabled: e.target.checked }));
 $("#t-heat").addEventListener("change", (e) => post("/api/live/heat", { enabled: e.target.checked }));
 $("#b-replay").addEventListener("click", replay);
+$$("#folds button").forEach((b) => b.addEventListener("click", () => {
+  FOLD = b.dataset.fold; $$("#folds button").forEach((x) => x.classList.toggle("on", x === b)); loadProof();
+}));
 
 function connect() {
   const es = new EventSource("/api/stream");
@@ -216,8 +220,8 @@ function histChart(hh) {
 // ---------------------------------------------------------------- proof
 async function loadProof() {
   try {
-    if (!BENCH) { const r = await fetch("/api/bench"); BENCH = r.ok ? await r.json() : null; }
-    if (!META) META = await (await fetch("/api/meta")).json();
+    if (!BENCH || BENCH._fold !== FOLD) { const r = await fetch("/api/bench?fold=" + FOLD); BENCH = r.ok ? await r.json() : null; if (BENCH) BENCH._fold = FOLD; }
+    if (!META || META._fold !== FOLD) { META = await (await fetch("/api/meta?fold=" + FOLD)).json(); META._fold = FOLD; }
   } catch (e) { BENCH = null; }
   if (!BENCH || !BENCH.report) { $("#captured").textContent = "—"; $("#proof-table").innerHTML = "<tr><td>No benchmark yet: run <code>python -m gridq.bench.run_days</code></td></tr>"; return; }
   const R = BENCH.report, C = BENCH.controllers;
@@ -250,7 +254,8 @@ async function loadProof() {
   const fc = META && META.forecast;
   $("#forecast-card").innerHTML = fc ? forecastHtml(fc) : "<span class='muted'>No trained forecaster (seasonal-naive in use).</span>";
   const d = META || {};
-  $("#provenance").innerHTML = `Demand: ${d.source || "?"}${d.test_range ? `, held-out ${d.test_range[0]} → ${d.test_range[1]}` : ""} · Solar: NASA POWER (${d.solar_site || "site"}) · ` +
+  const fr = d.folds && d.folds[FOLD];
+  $("#provenance").innerHTML = `Demand: ${d.source || "?"}${fr ? `, held-out ${fr.test_range[0]} → ${fr.test_range[1]} (forecaster trained on ${fr.train_range[0]} → ${fr.train_range[1]} only)` : ""} · Solar: NASA POWER (${d.solar_site || "site"}) · ` +
     `${R.GridQ.total_cost_rs.n} report scenario-days (held-out days 11–${BENCH.meta.n_days} × ${BENCH.meta.seeds} outage seeds; days 1–10 used for tuning only) · method after Panda et al. 2024 · ` +
     `worst GridQ day: ${w ? `${w.date} seed ${w.seed}, ${rs(w.total_cost_rs)} (${w.outage_steps / 4} h outage)` : "—"} · git ${BENCH.meta.git} · params ${BENCH.meta.params_hash} · ${BENCH.meta.date}` +
     (BENCH.meta.fallback && BENCH.meta.fallback.demand ? `<div class="flag">⚠ benchmark ran on SYNTHETIC demand</div>` : "");

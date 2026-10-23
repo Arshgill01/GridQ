@@ -650,8 +650,8 @@ def api_calibrate():
 
 
 @app.get("/api/bench")
-def api_bench():
-    f = ROOT / "data" / "bench" / "results.json"
+def api_bench(fold: str = "winter"):
+    f = ROOT / "data" / "bench" / ("results.json" if fold == "winter" else f"results_{fold}.json")
     if not f.exists():
         return J({"error": "no results.json: run python -m gridq.bench.run_days"}, 404)
     return FileResponse(f, media_type="application/json")
@@ -671,10 +671,10 @@ def api_tune():
 
 
 @app.get("/api/meta")
-def api_meta():
+def api_meta(fold: str = "winter"):
     f = ROOT / P["data"]["meta_json"]
     m = json.loads(f.read_text()) if f.exists() else {}
-    fm = ROOT / "data" / "models" / "metrics.json"
+    fm = ROOT / "data" / "models" / ("" if fold == "winter" else fold) / "metrics.json"
     if fm.exists():
         m["forecast"] = json.loads(fm.read_text())
     m["fallback"] = LIVE.ds.fallback
