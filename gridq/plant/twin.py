@@ -33,6 +33,8 @@ class Timeline:
     grid_sched: np.ndarray         # bool per step (bench outages); all True live
     pre_dem: dict = field(default_factory=dict)   # measured history before step 0 (up to 7 days)
     pre_pv: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    day_cal: np.ndarray = field(default_factory=lambda: np.zeros((0, 2)))      # per day: weekday, workday
+    pre_day_cal: np.ndarray = field(default_factory=lambda: np.zeros((0, 2)))
 
     @property
     def n_steps(self) -> int:
@@ -59,6 +61,8 @@ class Timeline:
         pre_dem = {l: np.concatenate([_day_load(p, d, l) for d in pre]) if pre else np.zeros(0) for l in INFLEX}
         pre_pv = np.concatenate([d.pv for d in pre]) if pre else np.zeros(0)
         return Timeline(pre_dem=pre_dem, pre_pv=pre_pv,
+            day_cal=np.array([[d.weekday, float(d.workday)] for d in days], float).reshape(-1, 2),
+            pre_day_cal=np.array([[d.weekday, float(d.workday)] for d in pre], float).reshape(-1, 2),
             dates=[d.date for d in days], n_days=n_sim,
             demand={l: np.concatenate(v) for l, v in dem.items()},
             pv=np.concatenate(pv), pv_clear=np.concatenate(pvc),
@@ -245,6 +249,23 @@ class Twin:
         """Clear-sky PV (deterministic, known ahead). Steps before the run use the same time of day."""
         idx = np.arange(k0, k1)
         return self.tl.pv_clear[np.where(idx >= 0, idx, idx % SPD)]
+
+    def calendar(self, k0: int, k1: int) -> tuple[np.ndarray, np.ndarray]:
+        """(weekday, workday) per step: the calendar is known in advance."""
+        days = np.arange(k0, k1) // SPD
+        out = np.zeros((len(days), 2))
+        dc, pc = self.tl.day_cal, self.tl.pre_day_cal
+        for d in np.unique(days):
+            if 0 <= d < len(dc):
+                v = dc[d]
+            elif d < 0 and len(pc) >= -d:
+                v = pc[d]
+            else:
+                ref = dc[0] if d < 0 else dc[-1]
+                wd = (ref[0] + (d if d < 0 else d - len(dc) + 1)) % 7
+                v = (wd, float(wd < 5))
+            out[days == d] = v
+        return out[:, 0], out[:, 1]
 
     def tariff_slice(self, k0: int, k1: int) -> np.ndarray:
         return self.tl.tariff[k0:k1]

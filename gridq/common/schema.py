@@ -32,6 +32,8 @@ def state_payload(tw, obs: Observation, T: int) -> dict:
         "clear_start": k - 2 * SPD,
         "clear": _l(tw.clear(k - 2 * SPD, k + 2 * T)),
         "tariff": _l(tw.tariff_slice(k, k + T)),
+        "cal_start": h0,
+        "calendar": [_l(a) for a in tw.calendar(h0, k + 2 * T)],
         "future_sessions": tw.future_sessions(k, T),
         "fair_today": tw.fair_today(k),
         "events": {"software_outage": tw.software_outage, "cloud_until": tw.cloud_until,
@@ -60,6 +62,11 @@ class BrainView:
     def clear(self, k0, k1):
         idx = np.clip(np.arange(k0, k1) - self.c0, 0, len(self.clr) - 1)
         return self.clr[idx]
+
+    def calendar(self, k0, k1):
+        wd, wk = (np.array(a, float) for a in self.st["calendar"])
+        i = np.clip(np.arange(k0, k1) - self.st["cal_start"], 0, len(wd) - 1)
+        return wd[i], wk[i]
 
     def tariff_slice(self, k0, k1):
         return self.tar[k0 - self.k:k1 - self.k]

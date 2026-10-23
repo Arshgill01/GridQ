@@ -26,6 +26,7 @@ class DayData:
     pv: np.ndarray                 # kW (true, before events)
     pv_clear: np.ndarray           # kW clear-sky
     split: str = "test"            # train | test
+    workday: bool = True           # campus working day (published IIIT-D calendar; weekday rule if absent)
 
 
 @dataclass
@@ -138,6 +139,7 @@ def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
                 demand={f: g[f].values.astype(float) for f in IBLEND_FEEDERS},
                 pv=np.asarray(pv, float), pv_clear=np.asarray(pvc, float),
                 split=str(g["split"].iloc[0]) if "split" in g else "test",
+                workday=bool(g["workday"].iloc[0]) if "workday" in g else pd.Timestamp(dstr).weekday() < 5,
             ))
     else:
         log.warning("I-BLEND demand CSV missing: using SYNTHETIC demand (flagged)")
@@ -150,7 +152,8 @@ def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
             pv, pvc = _synthetic_solar(p, rng)
             days.append(DayData(
                 date=str(d.date()), weekday=d.weekday(), demand=_synthetic_demand(rng),
-                pv=pv, pv_clear=pvc, split="test" if i >= synthetic_days - n_test else "train"))
+                pv=pv, pv_clear=pvc, split="test" if i >= synthetic_days - n_test else "train",
+                workday=d.weekday() < 5))
         meta = {"source": "SYNTHETIC fallback (I-BLEND unavailable)"}
     if fallback["solar"]:
         log.warning("NASA POWER solar missing for some days: synthetic clear-sky bell used (flagged)")
