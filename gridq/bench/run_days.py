@@ -144,6 +144,13 @@ def report(p, results, controllers):
             for key in ("total_cost_rs", "cost_rs"):
                 out.setdefault("captured_pct", {})[f"{split}_{key}"] = M.captured_pct(
                     s["B1"][key]["sum"], s["GridQ"][key]["sum"], s["Oracle"][key]["sum"])
+            # honest headline: against whichever rule-based baseline was cheaper on these days
+            base = [c for c in ("B0", "B1") if s.get(c)]
+            best = min(base, key=lambda c: s[c]["total_cost_rs"]["sum"])
+            out.setdefault("best_baseline", {})[split] = {
+                "name": best, "captured_pct": M.captured_pct(s[best]["total_cost_rs"]["sum"], s["GridQ"]["total_cost_rs"]["sum"],
+                                                              s["Oracle"]["total_cost_rs"]["sum"]),
+                "saving_rs": s[best]["total_cost_rs"]["sum"] - s["GridQ"]["total_cost_rs"]["sum"]}
     if "GridQ" in per and "Oracle" in per:
         key = lambda d: (d["seed"], d["day"])
         o = {key(d): d["total_cost_rs"] for d in per["Oracle"] if r0 <= d["day"] <= r1}

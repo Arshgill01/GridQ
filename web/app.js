@@ -221,10 +221,16 @@ async function loadProof() {
   } catch (e) { BENCH = null; }
   if (!BENCH || !BENCH.report) { $("#captured").textContent = "—"; $("#proof-table").innerHTML = "<tr><td>No benchmark yet: run <code>python -m gridq.bench.run_days</code></td></tr>"; return; }
   const R = BENCH.report, C = BENCH.controllers;
-  const cap = BENCH.captured_pct && BENCH.captured_pct.report_total_cost_rs;
-  $("#captured").textContent = cap != null ? `${fmt(cap, 0)}%` : "—";
+  const capB1 = BENCH.captured_pct && BENCH.captured_pct.report_total_cost_rs;
+  const bb = BENCH.best_baseline && BENCH.best_baseline.report;
   const sumT = (c) => R[c].total_cost_rs.sum;
-  $("#captured-sub").innerHTML = `of the achievable saving captured: GridQ ${rs(sumT("GridQ"))} vs B1 ${rs(sumT("B1"))} vs Oracle bound ${rs(sumT("Oracle"))} over ${R.GridQ.total_cost_rs.n || ""} held-out report scenario-days (total cost of service incl. unserved energy)`;
+  const n = R.GridQ.total_cost_rs.n;
+  if (bb) {
+    $("#captured").textContent = `${fmt(bb.captured_pct, 0)}%`;
+    $("#captured-sub").innerHTML = `of the achievable saving captured vs the <b>better</b> rule-based baseline (${bb.name}) on ${n} held-out report scenario-days: ` +
+      `GridQ ${rs(sumT("GridQ"))} vs ${bb.name} ${rs(sumT(bb.name))} vs Oracle bound ${rs(sumT("Oracle"))}, saving ${rs(bb.saving_rs)} (${fmt(100 * bb.saving_rs / sumT(bb.name), 1)}%). ` +
+      `Spec definition (vs B1 smart ToD rules): <b>${fmt(capB1, 0)}%</b>. Total cost of service = bill + diesel + demand charge + battery wear + unserved energy at VoLL.`;
+  } else { $("#captured").textContent = capB1 != null ? `${fmt(capB1, 0)}%` : "—"; }
   const rows = [
     ["Total cost of service ₹/day", "total_cost_rs", 0], ["Energy bill + diesel ₹/day", "cost_rs", 0], ["Battery wear ₹/day", "battery_wear_rs", 0],
     ["Unserved energy kWh/day", "unserved_kwh_total", 1], ["Clinic uptime %", "critical_uptime_pct", 2], ["Diesel L/day", "diesel_l", 1],
