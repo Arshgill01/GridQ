@@ -297,6 +297,11 @@ void setup() {
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   xTaskCreatePinnedToCore(netTask, "net", 8192, nullptr, 1, nullptr, 0);
+  // gauge self-test while Wi-Fi joins (the net task runs on the other core): full sweep, then the loop
+  // glides to the real battery level once GridQ answers
+  servo.write(SERVO_MIN_DEG); delay(500);
+  servo.write(SERVO_MAX_DEG); delay(700);
+  servoPos = SERVO_MAX_DEG;
 }
 
 void loop() {
@@ -310,7 +315,7 @@ void loop() {
     tServo = now;
     if (!linkLost) {
       float tgt = SERVO_MIN_DEG + constrain(socTarget, 0.0f, 1.0f) * (SERVO_MAX_DEG - SERVO_MIN_DEG);
-      float d = constrain(tgt - servoPos, -3.0f, 3.0f);
+      float d = constrain(tgt - servoPos, -9.0f, 9.0f);     // up to 180°/s: still a glide, but big jumps snap across
       if (fabs(d) > 0.01) { servoPos += d; servo.write((int)round(servoPos)); }
     }
   }
