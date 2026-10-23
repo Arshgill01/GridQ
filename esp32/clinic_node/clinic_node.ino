@@ -19,7 +19,8 @@
 #include <ArduinoJson.h>
 #include <LiquidCrystal_I2C.h>
 #include <ESP32Servo.h>
-#include "secrets.h"   // WIFI_SSID, WIFI_PASS, GRIDQ_HOST
+#include <ESPmDNS.h>
+#include "secrets.h"   // WIFI_SSID, WIFI_PASS, GRIDQ_HOST (first guess; the node finds the UNO Q itself if it moves)
 
 // ---------------------------------------------------------------- config (mirrors config/hardware.yaml)
 const int PIN_SDA = 21, PIN_SCL = 22, PIN_SERVO = 18, PIN_TRIG = 5, PIN_ECHO = 19, PIN_LED = 2;
@@ -43,6 +44,7 @@ char sensorKind[8] = "";
 float sensorValue = 0;
 volatile long lastSeq = -1;
 volatile int lastHttp = 0;
+String gridqHost = GRIDQ_HOST;     // current address of the UNO Q (rediscovered when the link is lost)
 
 LiquidCrystal_I2C* lcd = nullptr;
 Servo servo;
@@ -102,7 +104,39 @@ bool readSensor(float& v) {
 }
 
 // ---------------------------------------------------------------- network task (core 0)
-String url(const char* path) { return String("http://") + GRIDQ_HOST + ":" + GRIDQ_PORT + path; }
+String url(const char* path) { return String("http://") + gridqHost + ":" + GRIDQ_PORT + path; }
+
+bool isGridq(const String& host) {        // does this address answer like GridQ's clinic endpoint?
+  HTTPClient http;
+  http.setConnectTimeout(250);
+  http.setTimeout(600);
+  if (!http.begin(String("http://") + host + ":" + GRIDQ_PORT + "/api/node/clinic")) return false;
+  int code = http.GET();
+  bool ok = code == 200 && http.getString().indexOf("\"l1\"") >= 0;
+  http.end();
+  return ok;
+}
+
+// The hotspot may hand the UNO Q a new address after a reconnect. Try, in order:
+// the configured host, mDNS "uno-q.local", then every address on our /24.
+bool discover() {
+  if (isGridq(GRIDQ_HOST)) { gridqHost = GRIDQ_HOST; return true; }
+  static bool mdnsUp = false;
+  if (!mdnsUp) mdnsUp = MDNS.begin("gridq-clinic");      // needs the Wi-Fi link, so started lazily
+  IPAddress m = mdnsUp ? MDNS.queryHost("uno-q", 1500) : IPAddress(0, 0, 0, 0);
+  if (m != IPAddress(0, 0, 0, 0) && isGridq(m.toString())) { gridqHost = m.toString(); return true; }
+  IPAddress me = WiFi.localIP();
+  for (int i = 1; i < 255; i++) {
+    if (i == me[3]) continue;
+    IPAddress cand(me[0], me[1], me[2], i);
+    WiFiClient c;
+    if (c.connect(cand, GRIDQ_PORT, 120)) {
+      c.stop();
+      if (isGridq(cand.toString())) { gridqHost = cand.toString(); return true; }
+    }
+  }
+  return false;
+}
 
 bool postJson(const char* path, const String& body) {
   HTTPClient http;
@@ -162,7 +196,17 @@ void netTask(void*) {
       }
       http.end();
       if (ok) { failCount = 0; linkLost = false; }
-      else { failCount = failCount + 1; if (failCount >= 5) linkLost = true; }
+      else {
+        failCount = failCount + 1;
+        if (failCount >= 5) linkLost = true;
+        static unsigned long lastDisc = 0;
+        if (failCount >= 8 && millis() - lastDisc > 30000) {     // rediscover at most every 30 s
+          lastDisc = millis();
+          Serial.println("GridQ not answering: discovering...");
+          if (discover()) { Serial.printf("found GridQ at %s\n", gridqHost.c_str()); failCount = 0; }
+          else Serial.println("GridQ not found on this network");
+        }
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(20));
   }
@@ -230,7 +274,7 @@ void loop() {
     bool valid = cm >= 2.0f;                       // HC-SR04 minimum range: shorter echoes are noise/wiring
     static unsigned long tDbg = 0;
     if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d ip=%s host=%s http=%d link=%s\n", us, cm, valid ? "" : "(invalid)",
-        WiFi.status(), WiFi.localIP().toString().c_str(), GRIDQ_HOST, lastHttp, linkLost ? "LOST" : "ok"); }
+        WiFi.status(), WiFi.localIP().toString().c_str(), gridqHost.c_str(), lastHttp, linkLost ? "LOST" : "ok"); }
     if (valid) {                                   // noise echoes are skipped, they neither count nor reset the streak
       if (cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; evArmed = true; }
     }
