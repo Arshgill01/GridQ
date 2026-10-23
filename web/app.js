@@ -73,7 +73,8 @@ function render(s) {
   $("#sensor-last").textContent = s.live.sensor && s.live.sensor.kind ? `last sensor: ${s.live.sensor.kind} = ${fmt(s.live.sensor.value, 1)} · PV ×${fmt(s.live.sky_mult, 2)} · hostel ×${fmt(s.live.heat_mult, 2)}` : "no sensor data yet";
 
   // live
-  $("#survival").textContent = s.survival_h >= 48 ? "> 48 h" : hm(s.survival_h);
+  $("#survival").textContent = s.survival_batt_h >= 48 ? "> 48 h" : hm(s.survival_batt_h);
+  $("#survival-dg").textContent = `with the diesel genset (${fmt(s.tank_l, 0)} L in tank): ${s.survival_h >= 48 ? "> 48 h" : hm(s.survival_h)}`;
   $("#price").textContent = s.shadow_price != null ? `₹${fmt(s.shadow_price, 1)}/kWh` : "—";
   const f = s.flows;
   setSrc("#src-pv", `${fmt(f.pv - f.curt)} kW` + (f.curt > 0.05 ? ` (${fmt(f.curt)} curtailed)` : ""), f.pv > 0.05);

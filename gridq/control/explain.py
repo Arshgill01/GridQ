@@ -131,7 +131,7 @@ def explain(p: dict, data: lp.LPData, res: lp.LPResult, k: int, budget_ok: bool 
 
 
 def survival_hours(p: dict, soc: float, soc_min: float, p_dis: float, tank_l: float, clinic_p90: np.ndarray,
-                   pv_fc: np.ndarray, cap_h: float = 48.0) -> float:
+                   pv_fc: np.ndarray, cap_h: float = 48.0, use_dg: bool = True) -> float:
     """Grid down from now: serve only the clinic at P90 from forecast PV, then battery to soc_min,
     then diesel until the tank is empty. Returns hours until the first unmet step (capped)."""
     eta = p["battery"]["eta_discharge"]
@@ -143,7 +143,7 @@ def survival_hours(p: dict, soc: float, soc_min: float, p_dis: float, tank_l: fl
         dis = min(need, p_dis, max(0.0, (soc - soc_min) * eta / DT))
         soc -= dis / eta * DT
         need -= dis
-        if need > 1e-9:
+        if need > 1e-9 and use_dg:
             dg = min(need, dmax, tank_l / (DT * lpk))
             tank_l -= dg * DT * lpk
             need -= dg

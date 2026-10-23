@@ -298,7 +298,8 @@ class Live:
         return "".join(c)
 
     # ---------------- derived values
-    def survival(self) -> float:
+    def survival(self, use_dg: bool = True) -> float:
+        """Grid down from now, clinic only at P90, forecast PV, battery to its floor (then diesel)."""
         tw = self.twin
         k = tw.k
         n = 2 * SPD
@@ -306,7 +307,7 @@ class Live:
         clinic_p90 = clinic_nominal(P)[sod] * 1.1
         ke = clearness(tw, k)
         pv = tw.clear(k, k + n) * ke if k + n <= len(tw.tl.pv_clear) else np.zeros(n)
-        return X.survival_hours(P, tw.soc, tw.soc_min, tw.pdis0 * tw.pow_f, tw.tank, clinic_p90, pv)
+        return X.survival_hours(P, tw.soc, tw.soc_min, tw.pdis0 * tw.pow_f, tw.tank, clinic_p90, pv, use_dg=use_dg)
 
     def feeder_chips(self, r) -> list[dict]:
         chips = []
@@ -344,6 +345,7 @@ class Live:
         hour = (k % SPD) * DT
         rate, band = tariff_for_hour(P, hour)
         surv = self.survival()
+        surv_batt = self.survival(use_dg=False)
         expl = self.explain["items"] if self.explain and self.plan and self.explain["step"] >= self.plan["step"] - 1 else []
         mode = "SAFE" if (not self.mcu_ok or self.status.mode == "S") else (
             "CONSTRAINED" if getattr(self, "led_state", "N") == "C" else "NORMAL")
@@ -364,7 +366,7 @@ class Live:
             "flows": {k2: (round(r[k2], 2) if r else 0.0) for k2 in ("pv", "grid", "dg", "curt", "ch", "dis")},
             "tank_l": tw.tank,
             "feeders": self.feeder_chips(r) if r else [],
-            "survival_h": surv,
+            "survival_h": surv, "survival_batt_h": surv_batt,
             "shadow_price": plan["shadow_price"] if plan else None,
             "explanations": expl,
             "plan": {"step": plan["step"], "horizon": plan["horizon"], "binding": plan["binding"],
@@ -390,7 +392,8 @@ class Live:
                 if top is None and self.explain["items"]:
                     top = self.explain["items"][0].get("lcd")
             pv = self.last_result["pv"] if self.last_result else 0.0
-            l1, l2 = NF.lines(mode, self.grid_up, tw.k, self.survival(), top, tw.soc / tw.cap, pv)
+            l1, l2 = NF.lines(mode, self.grid_up, tw.k, self.survival(use_dg=False), top, tw.soc / tw.cap, pv)
+            l2.insert(1, NF.fit(f"+DIESEL {'>48h' if (s := self.survival()) >= 48 else NF.secure(s)[7:]}"))
             clinic_on = bool(self.last_result and self.last_result["served"]["clinic"] >= 0.99 * self.last_result["demand"]["clinic"])
             return {"l1": l1, "l2": l2, "soc": round(tw.soc / tw.cap, 3), "mode": mode, "clinic_on": clinic_on,
                     "seq": self.seq}
@@ -484,6 +487,11 @@ def _startup():
 @app.on_event("shutdown")
 def _shutdown():
     SUP.stop()
+
+
+@app.exception_handler(json.JSONDecodeError)
+async def _bad_json(req, exc):
+    return Response(json.dumps({"error": f"bad JSON: {exc}"}), status_code=400, media_type="application/json")
 
 
 def J(obj, code=200):
