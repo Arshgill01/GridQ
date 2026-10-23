@@ -37,6 +37,7 @@ char l2[3][17] = {"CONNECTING...", "", ""};
 int l2n = 1;
 float socTarget = 0.5;
 volatile bool linkLost = false;
+volatile bool everLinked = false;     // until the first answer the LCD shows boot progress, not LINK LOST
 volatile int failCount = 0;
 volatile bool evPending = false;
 volatile bool sensorReady = false;
@@ -117,10 +118,33 @@ bool isGridq(const String& host) {        // does this address answer like GridQ
   return ok;
 }
 
+// 2 = GridQ answers there · 1 = a host is there but GridQ isn't listening yet (a fast refusal, e.g. the
+// UNO Q is up and the app is still starting) · 0 = silence (board off, wrong address, or a stalled radio)
+int probe(const String& host) {
+  IPAddress ip;
+  if (!ip.fromString(host)) return 0;
+  WiFiClient c;
+  unsigned long t = millis();
+  bool open = c.connect(ip, GRIDQ_PORT, 2500);
+  unsigned long dt = millis() - t;
+  c.stop();
+  int r = open ? (isGridq(host) ? 2 : 1) : (dt < 2000 ? 1 : 0);   // hotspot round trips reach ~0.5 s
+  static int lastR = -1;
+  if (r != lastR) { lastR = r; Serial.printf("probe %s: %s after %lu ms\n", host.c_str(), open ? "open" : r ? "refused" : "silent", dt); }
+  return r;
+}
+
 // The hotspot may hand the UNO Q a new address after a reconnect. Try, in order:
-// the configured host, mDNS "uno-q.local", then every address on our /24.
+// the last known and configured hosts, mDNS "uno-q.local", then every address on our /24, re-checking
+// the known hosts as the sweep goes so a GridQ that comes up mid-sweep is picked up at once.
+bool knownHostsUp() {
+  if (isGridq(gridqHost)) return true;
+  if (gridqHost != GRIDQ_HOST && isGridq(GRIDQ_HOST)) { gridqHost = GRIDQ_HOST; return true; }
+  return false;
+}
+
 bool discover() {
-  if (isGridq(GRIDQ_HOST)) { gridqHost = GRIDQ_HOST; return true; }
+  if (knownHostsUp()) return true;
   static bool mdnsUp = false;
   if (!mdnsUp) mdnsUp = MDNS.begin("gridq-clinic");      // needs the Wi-Fi link, so started lazily
   IPAddress m = mdnsUp ? MDNS.queryHost("uno-q", 1500) : IPAddress(0, 0, 0, 0);
@@ -128,6 +152,7 @@ bool discover() {
   IPAddress me = WiFi.localIP();
   for (int i = 1; i < 255; i++) {
     if (i == me[3]) continue;
+    if (i % 16 == 0 && knownHostsUp()) return true;
     IPAddress cand(me[0], me[1], me[2], i);
     WiFiClient c;
     if (c.connect(cand, GRIDQ_PORT, 120)) {
@@ -195,22 +220,38 @@ void netTask(void*) {
         }
       }
       http.end();
-      if (ok) { failCount = 0; linkLost = false; }
+      if (ok) { failCount = 0; linkLost = false; everLinked = true; }
       else {
         failCount = failCount + 1;
         if (failCount >= 5) linkLost = true;
-        // "connected" but nothing answers: the radio link can stall silently on a phone hotspot, so
-        // rejoin first (cheap), then rediscover GridQ if it still isn't answering
-        static unsigned long lastRejoin = 0, lastDisc = 0;
-        if (failCount >= 8 && (lastRejoin == 0 || millis() - lastRejoin > 60000)) {
-          lastRejoin = millis();
-          Serial.println("GridQ not answering: rejoining Wi-Fi");
-          WiFi.disconnect(); WiFi.begin(WIFI_SSID, WIFI_PASS);
-        } else if (failCount >= 16 && millis() - lastDisc > 30000) {     // rediscover at most every 30 s
-          lastDisc = millis();
-          Serial.println("GridQ not answering: discovering...");
-          if (discover()) { Serial.printf("found GridQ at %s\n", gridqHost.c_str()); failCount = 0; }
-          else Serial.println("GridQ not found on this network");
+        static unsigned long lastRejoin = 0, lastDisc = 0, refusedSince = 0;
+        if (failCount >= 8) {
+          int pr = probe(gridqHost);
+          if (pr == 2) failCount = 0;                       // it just came up: the next poll links
+          else if (pr == 1) {
+            // the board is there and refusing: GridQ is still starting. Keep polling; don't drop Wi-Fi.
+            // Only if that lasts 2 min (our address now belongs to another device?) search the network.
+            if (refusedSince == 0) refusedSince = millis();
+            if (millis() - refusedSince > 120000 && millis() - lastDisc > 60000) {
+              lastDisc = millis();
+              Serial.println("GridQ refused for 2 min: discovering...");
+              if (discover()) { Serial.printf("found GridQ at %s\n", gridqHost.c_str()); failCount = 0; }
+            }
+          } else {
+            refusedSince = 0;
+            // total silence: a phone-hotspot radio link can stall while still "connected", so rejoin
+            // first (cheap), then search the network
+            if (lastRejoin == 0 || millis() - lastRejoin > 60000) {
+              lastRejoin = millis();
+              Serial.println("GridQ silent: rejoining Wi-Fi");
+              WiFi.disconnect(); WiFi.begin(WIFI_SSID, WIFI_PASS);
+            } else if (failCount >= 16 && millis() - lastDisc > 60000) {
+              lastDisc = millis();
+              Serial.println("GridQ silent: discovering...");
+              if (discover()) { Serial.printf("found GridQ at %s\n", gridqHost.c_str()); failCount = 0; }
+              else Serial.println("GridQ not found on this network");
+            }
+          }
         }
       }
     }
@@ -281,7 +322,7 @@ void loop() {
     bool valid = cm >= 2.0f;                       // HC-SR04 minimum range: shorter echoes are noise/wiring
     static unsigned long tDbg = 0;
     if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d ip=%s host=%s http=%d link=%s\n", us, cm, valid ? "" : "(invalid)",
-        WiFi.status(), WiFi.localIP().toString().c_str(), gridqHost.c_str(), lastHttp, linkLost ? "LOST" : "ok"); }
+        WiFi.status(), WiFi.localIP().toString().c_str(), gridqHost.c_str(), lastHttp, !everLinked ? "wait" : linkLost ? "LOST" : "ok"); }
     if (valid) {                                   // noise echoes are skipped, they neither count nor reset the streak
       if (cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; evArmed = true; }
     }
@@ -310,7 +351,10 @@ void loop() {
   if (now - tCycle >= 3000) { tCycle = now; l2i++; }
   if (now - tLcd >= 250) {
     tLcd = now;
-    if (linkLost) { lcdLine(0, "LINK LOST"); lcdLine(1, "CLINIC LOCAL ON"); }
+    if (!everLinked) {
+      lcdLine(0, "GRIDQ CLINIC");
+      lcdLine(1, WiFi.status() == WL_CONNECTED ? "FINDING GRIDQ..." : "CONNECTING WIFI");
+    } else if (linkLost) { lcdLine(0, "LINK LOST"); lcdLine(1, "CLINIC LOCAL ON"); }
     else {
       char a[17], b[17];
       portENTER_CRITICAL(&mux);
@@ -321,7 +365,9 @@ void loop() {
     }
   }
 
-  // status LED: solid = linked, 5 Hz blink = link lost
-  if (linkLost) { if (now - tLed >= 100) { tLed = now; digitalWrite(PIN_LED, !digitalRead(PIN_LED)); } }
-  else digitalWrite(PIN_LED, WiFi.status() == WL_CONNECTED ? HIGH : LOW);
+  // blue LED (GPIO2; the red one is power): solid = linked to GridQ · slow blink = on Wi-Fi, waiting
+  // for GridQ · fast blink = no Wi-Fi
+  bool wifiUp = WiFi.status() == WL_CONNECTED;
+  if (wifiUp && everLinked && !linkLost) digitalWrite(PIN_LED, HIGH);
+  else if (now - tLed >= (wifiUp ? 500UL : 100UL)) { tLed = now; digitalWrite(PIN_LED, !digitalRead(PIN_LED)); }
 }
