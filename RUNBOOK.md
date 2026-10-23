@@ -63,7 +63,7 @@ with or without Linux.
 2. Copy `esp32/clinic_node/secrets.h.example` to `secrets.h` and set the hotspot SSID/password and the UNO Q IP.
 3. Flash `esp32/clinic_node/clinic_node.ino`. Serial monitor at 115200 prints the I2C scan and the detected sensor.
 4. Expected: LCD line 1 `GRID OK   16:15`, line 2 cycles `SECURE …`, the top decision, and `BATT ..% PV ..kW`.
-   The servo tracks battery SoC. A hand under the HC-SR04 (< 12 cm, 3 readings) fires one `ev_fleet` event.
+   The servo tracks battery SoC. A hand held still 3–12 cm under the HC-SR04 for about 1 s (5 steady readings) fires one `ev_fleet` event.
    Stop the app on the UNO Q and the LCD shows `LINK LOST / CLINIC LOCAL ON` within 6 s.
 5. Blue LED (GPIO2): solid = linked · slow blink = on Wi-Fi, waiting for GridQ · fast blink = no Wi-Fi.
    At power-up the LCD shows `CONNECTING WIFI`, then `FINDING GRIDQ...` until the UNO Q answers (about a

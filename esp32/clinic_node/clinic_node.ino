@@ -25,7 +25,8 @@
 // ---------------------------------------------------------------- config (mirrors config/hardware.yaml)
 const int PIN_SDA = 21, PIN_SCL = 22, PIN_SERVO = 18, PIN_TRIG = 5, PIN_ECHO = 19, PIN_LED = 2;
 const int SERVO_MIN_DEG = 10, SERVO_MAX_DEG = 170;
-const int EV_THRESHOLD_CM = 12, EV_CONSECUTIVE = 3;
+const int EV_THRESHOLD_CM = 12, EV_CONSECUTIVE = 5;    // 5 readings x 200 ms: a hand held ~1 s, not a noise spike
+const float EV_MIN_CM = 3.0f, EV_SPREAD_CM = 3.0f;      // a real hand reads steady; wiring noise jumps around
 const unsigned long EV_COOLDOWN_MS = 10000;
 uint8_t LCD_ADDR = 0x27;               // auto-falls back to 0x3F if 0x27 is absent
 const int GRIDQ_PORT = 8000;
@@ -269,6 +270,7 @@ void lcdLine(int row, const char* s) {
 
 float servoPos = 90;
 int evStreak = 0;
+float evLo = 0, evHi = 0;
 bool evArmed = true;
 unsigned long lastEv = 0;
 
@@ -324,7 +326,11 @@ void loop() {
     if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d ip=%s host=%s http=%d link=%s\n", us, cm, valid ? "" : "(invalid)",
         WiFi.status(), WiFi.localIP().toString().c_str(), gridqHost.c_str(), lastHttp, !everLinked ? "wait" : linkLost ? "LOST" : "ok"); }
     if (valid) {                                   // noise echoes are skipped, they neither count nor reset the streak
-      if (cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; evArmed = true; }
+      if (cm >= EV_MIN_CM && cm < EV_THRESHOLD_CM) {
+        if (evStreak == 0) { evLo = evHi = cm; }
+        evLo = min(evLo, cm); evHi = max(evHi, cm);
+        evStreak = (evHi - evLo <= EV_SPREAD_CM) ? evStreak + 1 : 0;   // jumpy readings restart the count
+      } else if (cm >= EV_THRESHOLD_CM) { evStreak = 0; evArmed = true; }
     }
     if (evStreak >= EV_CONSECUTIVE && evArmed && now - lastEv >= EV_COOLDOWN_MS) {
       evArmed = false;      // rising edge only: re-arms when the bay clears
