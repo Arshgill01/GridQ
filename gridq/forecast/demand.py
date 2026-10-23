@@ -63,7 +63,8 @@ def load_forecaster(p: dict):
     """Quantile models if available and validated, else seasonal naive (flagged)."""
     try:
         from gridq.forecast.model import QuantileForecaster
-        mdir = ROOT / "data" / "models"
+        fold = p["bench"].get("fold", "winter")
+        mdir = ROOT / "data" / "models" / ("" if fold == "winter" else fold)
         meta = json.loads((mdir / "metrics.json").read_text())
         if not meta.get("beats_naive", False):
             log.warning("quantile model did not beat seasonal naive on held-out days: using naive (flagged)")

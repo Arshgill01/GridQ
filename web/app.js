@@ -212,7 +212,7 @@ async function loadProof() {
   $("#forecast-card").innerHTML = fc ? forecastHtml(fc) : "<span class='muted'>No trained forecaster (seasonal-naive in use).</span>";
   const d = META || {};
   $("#provenance").innerHTML = `Demand: ${d.source || "?"}${d.test_range ? `, held-out ${d.test_range[0]} → ${d.test_range[1]}` : ""} · Solar: NASA POWER (${d.solar_site || "site"}) · ` +
-    `${(BENCH.meta.n_days - BENCH.meta.n_days + 20) * BENCH.meta.seeds} report scenario-days (days ${BENCH.meta.n_days ? "11–30" : ""} × ${BENCH.meta.seeds} outage seeds) · method after Panda et al. 2024 · ` +
+    `${R.GridQ.total_cost_rs.n} report scenario-days (held-out days 11–${BENCH.meta.n_days} × ${BENCH.meta.seeds} outage seeds; days 1–10 used for tuning only) · method after Panda et al. 2024 · ` +
     `worst GridQ day: ${w ? `${w.date} seed ${w.seed}, ${rs(w.total_cost_rs)} (${w.outage_steps / 4} h outage)` : "—"} · git ${BENCH.meta.git} · params ${BENCH.meta.params_hash} · ${BENCH.meta.date}` +
     (BENCH.meta.fallback && BENCH.meta.fallback.demand ? `<div class="flag">⚠ benchmark ran on SYNTHETIC demand</div>` : "");
 }

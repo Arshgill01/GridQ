@@ -143,6 +143,13 @@ def report(p, results, controllers):
             for key in ("total_cost_rs", "cost_rs"):
                 out.setdefault("captured_pct", {})[f"{split}_{key}"] = M.captured_pct(
                     s["B1"][key]["sum"], s["GridQ"][key]["sum"], s["Oracle"][key]["sum"])
+    if "GridQ" in per and "Oracle" in per:
+        key = lambda d: (d["seed"], d["day"])
+        o = {key(d): d["total_cost_rs"] for d in per["Oracle"] if r0 <= d["day"] <= r1}
+        g = {key(d): d["total_cost_rs"] for d in per["GridQ"] if r0 <= d["day"] <= r1}
+        common = [k for k in g if k in o]
+        out["oracle_le_gridq"] = {"days": len(common), "exceptions": sum(1 for k in common if o[k] > g[k] + 1e-6),
+                                  "note": "continuous runs: per-day order is not guaranteed, totals are"}
     if all(c in per for c in ("GridQ",)):
         rep = [d for d in per["GridQ"] if r0 <= d["day"] <= r1]
         if rep:
@@ -181,8 +188,13 @@ def main():
     ap.add_argument("--workers", type=int)
     ap.add_argument("--out", default=str(ROOT / "data" / "bench" / "results.json"))
     ap.add_argument("--set", action="append", default=[], help="override, e.g. mpc.scenarios.enabled=true")
+    ap.add_argument("--fold", default=None, help="held-out block: winter (spec, default) | summer")
     a = ap.parse_args()
     ov = {}
+    if a.fold:
+        ov["bench"] = {"fold": a.fold}
+        if a.out == str(ROOT / "data" / "bench" / "results.json") and a.fold != "winter":
+            a.out = str(ROOT / "data" / "bench" / f"results_{a.fold}.json")
     for kv in a.set:
         k, v = kv.split("=", 1)
         import yaml

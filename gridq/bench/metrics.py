@@ -80,5 +80,6 @@ def summarise(rows: list[dict]) -> dict:
     for k in SCALARS:
         v = np.array([r[k] for r in rows], float)
         out[k] = {"median": float(np.median(v)), "p10": float(np.percentile(v, 10)), "p90": float(np.percentile(v, 90)),
-                  "min": float(v.min()), "max": float(v.max()), "mean": float(v.mean()), "sum": float(v.sum())}
+                  "min": float(v.min()), "max": float(v.max()), "mean": float(v.mean()), "sum": float(v.sum()),
+                  "n": int(len(v))}
     return out

@@ -1,0 +1,100 @@
+{
+ "feeders": {
+  "hostel_a": {
+   "n_fit": 116411,
+   "n_cal": 92376,
+   "n_test": 55824,
+   "p50_mae_kw": 1.441719049439173,
+   "naive_mae_kw": 1.4764183182860418,
+   "p90_coverage_raw_pct": 83.94597305818287,
+   "p90_coverage_pct": 95.2171109200344,
+   "p90_pinball": 0.3700071151205557,
+   "naive_p90_coverage_pct": 95.72047864717685,
+   "same_daytype_mae_kw": 1.5011831739036972,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    1.115,
+    1.2,
+    1.269,
+    1.345
+   ]
+  },
+  "hostel_b": {
+   "n_fit": 116439,
+   "n_cal": 92376,
+   "n_test": 55824,
+   "p50_mae_kw": 1.0844250821144583,
+   "naive_mae_kw": 1.0229278966036113,
+   "p90_coverage_raw_pct": 85.8555460017197,
+   "p90_coverage_pct": 91.35318142734307,
+   "p90_pinball": 0.24213831628064267,
+   "naive_p90_coverage_pct": 97.65692175408427,
+   "same_daytype_mae_kw": 1.065447305818286,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    0.416,
+    0.413,
+    0.448,
+    0.484
+   ]
+  },
+  "academic": {
+   "n_fit": 116472,
+   "n_cal": 92376,
+   "n_test": 55824,
+   "p50_mae_kw": 2.0296757901475844,
+   "naive_mae_kw": 3.642528573731729,
+   "p90_coverage_raw_pct": 79.35296646603611,
+   "p90_coverage_pct": 86.36428776153625,
+   "p90_pinball": 0.5636407910285205,
+   "naive_p90_coverage_pct": 87.06291200917168,
+   "same_daytype_mae_kw": 2.068405653482373,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    0.482,
+    0.626,
+    0.689,
+    0.754
+   ]
+  }
+ },
+ "held_out": {
+  "p50_mae_kw": 1.5186066405670717,
+  "naive_mae_kw": 2.047291596207127,
+  "p90_coverage_pct": 90.9781933696379,
+  "p90_pinball": 0.39192874080990625,
+  "pv_mae_kw": 1.0536140720195912,
+  "pv_persist_mae_kw": 1.3725988757259528
+ },
+ "fold": "summer",
+ "beats_naive": true,
+ "model": "HistGradientBoostingRegressor quantile 0.5/0.9 per feeder, direct multi-horizon, 17 causal features; P90 split-conformal on the last 45 training days",
+ "train_range": [
+  "2013-08-10",
+  "2017-04-27"
+ ],
+ "test_range": [
+  "2017-05-01",
+  "2017-08-25"
+ ],
+ "features": [
+  "h",
+  "tod_sin",
+  "tod_cos",
+  "weekday",
+  "weekend",
+  "workday",
+  "lag96",
+  "lag672",
+  "last1",
+  "last4",
+  "last96",
+  "dev_yday",
+  "lag96_ratio",
+  "lag_same",
+  "same_minus_96",
+  "yday_workday",
+  "base"
+ ],
+ "train_s": 28.890336990356445
+}

@@ -90,12 +90,27 @@ def main():
     df = df[day.isin(good)]
     days = sorted(set(df.index.normalize()))
     n_test = p["data"]["test_days"]
-    test_days, train_days = days[-n_test:], days[:-n_test]
-    split = np.where(df.index.normalize().isin(test_days), "test", "train")
-    # scale on TRAINING days only (no information from the benchmark days)
+    dn = df.index.normalize()
+    folds = {}
+    for name, spec in p["data"]["folds"].items():
+        if spec.get("last"):
+            test = days[-n_test:]
+        else:
+            test = [d for d in days if d >= pd.Timestamp(spec["start"])][:n_test]
+        train = [d for d in days if d < test[0]]
+        folds[name] = (train, test)
+        col = "split" if spec.get("last") else f"split_{name}"
+        df[col] = np.where(dn.isin(test), "test", np.where(dn < test[0], "train", "after"))
+        meta.setdefault("folds", {})[name] = {"test_range": [str(test[0].date()), str(test[-1].date())],
+                                              "train_range": [str(train[0].date()), str(train[-1].date())],
+                                              "n_train_days": len(train), "column": col}
+    train_days, test_days = folds["winter"]
+    split = df["split"].values
+    # unit scaling uses only days before EVERY fold's held-out window (causal for all folds)
+    first_test = min(t[0] for _, t in folds.values())
     scale = {}
     for f in FEEDERS:
-        p95 = float(np.percentile(df.loc[split == "train", f], 95))
+        p95 = float(np.percentile(df.loc[dn < first_test, f], 95))
         scale[f] = p["data"]["scale_to_p95_kw"][f] / p95
         df[f] = df[f] * scale[f]
         meta["feeders"][f].update(raw_p95_kw=round(p95, 2), scale=round(scale[f], 5))
@@ -109,7 +124,6 @@ def main():
     dd = df.index.normalize()
     df["workday"] = cal["working_day"].reindex(dd).fillna(pd.Series(dd.weekday < 5, index=dd).astype(int)).astype(int).values
     df["activity"] = cal["activity"].reindex(dd).fillna("?").values
-    df["split"] = split
     out = df.round(4)
     out.index.name = "timestamp"
     out.to_csv(ROOT / p["data"]["demand_csv"])

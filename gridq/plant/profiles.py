@@ -104,8 +104,14 @@ def load_solar(p: dict) -> pd.DataFrame | None:
     return q
 
 
-def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
-    """Load processed real data; fall back to synthetic, flagged."""
+def split_column(p: dict, fold: str | None = None) -> str:
+    fold = fold or p["bench"].get("fold", "winter")
+    spec = p["data"].get("folds", {}).get(fold, {"last": True})
+    return "split" if spec.get("last") else f"split_{fold}"
+
+
+def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7, fold: str | None = None) -> Dataset:
+    """Load processed real data; fall back to synthetic, flagged. `fold` picks the held-out block."""
     demand_path = ROOT / p["data"]["demand_csv"]
     kw = p["solar"]["kwp"] * p["solar"]["performance_ratio"] / 1000
     solar = load_solar(p)
@@ -118,6 +124,7 @@ def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
         meta_path = ROOT / p["data"]["meta_json"]
         if meta_path.exists():
             meta = json.loads(meta_path.read_text())
+        scol = split_column(p, fold)
         sol_by_date = {str(d): g for d, g in solar.groupby(solar.index.date)} if solar is not None else {}
         for date, g in dem.groupby(dem.index.date):
             if len(g) != SPD:
@@ -138,7 +145,7 @@ def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
                 date=dstr, weekday=pd.Timestamp(dstr).weekday(),
                 demand={f: g[f].values.astype(float) for f in IBLEND_FEEDERS},
                 pv=np.asarray(pv, float), pv_clear=np.asarray(pvc, float),
-                split=str(g["split"].iloc[0]) if "split" in g else "test",
+                split=str(g[scol].iloc[0]) if scol in g else "test",
                 workday=bool(g["workday"].iloc[0]) if "workday" in g else pd.Timestamp(dstr).weekday() < 5,
             ))
     else:

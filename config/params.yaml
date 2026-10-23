@@ -70,6 +70,9 @@ data:
   scale_to_p95_kw: {hostel_a: 20, hostel_b: 18, academic: 25}   # keep real shape, scale to our block size
   min_day_coverage: 0.95       # drop days with >5% missing samples
   test_days: 30                # last 30 good days = held-out benchmark days
+  folds:                       # rolling-origin blocks; each fold's forecaster sees only data before its window
+    winter: {last: true}       # the spec's block: last 30 good days (Dec 2017) - the headline
+    summer: {start: "2017-05-01"}   # first 30 good days from this date (cooling season, cap binds)
 
 outages:
   per_day_lambda: 1.5          # Poisson
@@ -101,6 +104,7 @@ bench:
   seed_base: 1000
   outage_seeds: 5              # each real day x 5 outage patterns = 150 scenario-days (100 on report days)
   settle_rs_per_kwh: 6.0       # end-of-run battery energy settled at this rate (all controllers alike)
+  fold: winter                 # which held-out block run_days uses (winter = spec)
 
 safety:
   heartbeat_timeout_ms: 3000

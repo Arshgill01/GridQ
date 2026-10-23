@@ -26,11 +26,18 @@ CAL_DAYS = 45
 RNG = np.random.default_rng(0)
 
 
-def load_series(p):
+def model_dir(p, fold=None):
+    fold = fold or p["bench"].get("fold", "winter")
+    return ROOT / "data" / "models" / ("" if fold == "winter" else fold)
+
+
+def load_series(p, fold=None):
+    from gridq.plant.profiles import split_column
+    col = split_column(p, fold)
     df = pd.read_csv(ROOT / p["data"]["demand_csv"], parse_dates=["timestamp"]).set_index("timestamp").sort_index()
     full = pd.date_range(df.index.min().normalize(), df.index.max().normalize() + pd.Timedelta(hours=23, minutes=45), freq="15min")
     d = df.reindex(full)
-    split = d["split"].fillna("gap").values
+    split = d[col].fillna("gap").values
     day = full.normalize()
     weekday = full.weekday.values.astype(float)
     workday = d["workday"].astype(float).values if "workday" in d else (weekday < 5).astype(float)
@@ -60,10 +67,41 @@ def pinball(y, q, tau):
     return float(np.mean(np.maximum(tau * d, (tau - 1) * d)))
 
 
+def pv_eval(p, fold=None) -> dict:
+    """PV forecast (clear-sky x EWMA clearness) vs diurnal persistence (same time yesterday), held-out days."""
+    from gridq.forecast.solar import forecast_pv
+    from gridq.plant.profiles import load_dataset
+    ds = load_dataset(p, fold=fold)
+    test = ds.test_days()
+    i0 = ds.days.index(test[0])
+    days = ds.days[i0 - 1:i0 + len(test)]
+    pv = np.concatenate([d.pv for d in days])
+    clr = np.concatenate([d.pv_clear for d in days])
+
+    class V:
+        def __init__(s, k): s.k = k
+        def measured(s, name, a, b):
+            assert b <= s.k
+            out = np.full(b - a, np.nan); lo = max(a, 0); out[lo - a:] = pv[lo:b]; return out
+        def clear(s, a, b):
+            idx = np.clip(np.arange(a, b), 0, len(clr) - 1); return clr[idx]
+    e_fc, e_p = [], []
+    for k in range(SPD, len(pv) - SPD, 4):
+        fc = forecast_pv(V(k), k, SPD, pv[k])
+        e_fc.append(np.abs(pv[k + 1:k + SPD] - fc[1:]))
+        e_p.append(np.abs(pv[k + 1:k + SPD] - pv[k + 1 - SPD:k]))
+    return {"pv_mae_kw": float(np.mean(np.concatenate(e_fc))), "pv_persist_mae_kw": float(np.mean(np.concatenate(e_p)))}
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--fold", default=None)
+    fold = ap.parse_args().fold
     t0 = time.time()
     p = load_params()
-    d, full, split, sod, weekday, workday = load_series(p)
+    fold = fold or p["bench"]["fold"]
+    d, full, split, sod, weekday, workday = load_series(p, fold)
     idx = np.arange(len(full))
     train_days = sorted(set(full[split == "train"].normalize()))
     test_days = sorted(set(full[split == "test"].normalize()))
@@ -127,6 +165,8 @@ def main():
     held = {"p50_mae_kw": float(np.mean(np.abs(Y - P50))), "naive_mae_kw": float(np.mean(np.abs(Y - N))),
             "p90_coverage_pct": float(100 * np.mean(Y <= P90)), "p90_pinball": pinball(Y, P90, 0.9)}
     report["held_out"] = held
+    held.update(pv_eval(p, fold))
+    report["fold"] = fold
     report["beats_naive"] = bool(held["p50_mae_kw"] < held["naive_mae_kw"])
     report["model"] = (f"HistGradientBoostingRegressor quantile 0.5/0.9 per feeder, direct multi-horizon, "
                        f"{len(F.FEATURES)} causal features; P90 split-conformal on the last {CAL_DAYS} training days")
@@ -134,7 +174,7 @@ def main():
     report["test_range"] = [str(test_days[0].date()), str(test_days[-1].date())]
     report["features"] = F.FEATURES
     report["train_s"] = time.time() - t0
-    out = ROOT / "data" / "models"
+    out = model_dir(p, fold)
     out.mkdir(parents=True, exist_ok=True)
     joblib.dump(models, out / "demand_models.joblib", compress=3)
     (out / "metrics.json").write_text(json.dumps(report, indent=1))
