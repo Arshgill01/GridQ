@@ -92,8 +92,14 @@ def load_solar(p: dict) -> pd.DataFrame | None:
     df = pd.read_csv(path, parse_dates=["timestamp"])
     df = df.set_index("timestamp").sort_index()
     df[["ghi", "clr"]] = df[["ghi", "clr"]].clip(lower=0)
-    # hourly (LST, value = hour-ending average in NASA POWER) -> 15-min by linear interpolation
-    q = df[["ghi", "clr"]].resample("15min").asfreq().interpolate("linear", limit=4)
+    # NASA POWER hourly value HR=h is the mean over [h, h+1) local solar time: centre it at h:30,
+    # then linearly interpolate to 15-min step starts (gaps longer than 2 h stay missing)
+    df.index = df.index + pd.Timedelta(minutes=30)
+    full = pd.date_range(df.index.min().floor("D"), df.index.max().ceil("D"), freq="15min")
+    q = df[["ghi", "clr"]].reindex(df.index.union(full)).interpolate("time", limit=8, limit_area="inside")
+    q = q.reindex(full)
+    night = q.index.hour.isin([0, 1, 2, 3, 4, 21, 22, 23])
+    q.loc[night] = q.loc[night].fillna(0.0)
     return q
 
 
@@ -111,15 +117,13 @@ def load_dataset(p: dict, synthetic_days: int = 60, seed: int = 7) -> Dataset:
         meta_path = ROOT / p["data"]["meta_json"]
         if meta_path.exists():
             meta = json.loads(meta_path.read_text())
+        sol_by_date = {str(d): g for d, g in solar.groupby(solar.index.date)} if solar is not None else {}
         for date, g in dem.groupby(dem.index.date):
             if len(g) != SPD:
                 continue
             dstr = str(date)
             rng = np.random.default_rng(_date_seed(dstr))
-            if solar is not None:
-                s = solar.loc[dstr] if dstr in solar.index.strftime("%Y-%m-%d") else None
-            else:
-                s = None
+            s = sol_by_date.get(dstr)
             if s is not None and len(s) >= SPD and not s["ghi"].iloc[:SPD].isna().any():
                 pv = s["ghi"].values[:SPD] * kw
                 pvc = s["clr"].values[:SPD] * kw
