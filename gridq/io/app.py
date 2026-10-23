@@ -506,9 +506,10 @@ def internal_state(after_step: int = -1):
     L = LIVE
     deadline = time.time() + 2.0
     with L.cond:
-        while L.brain_state["step"] <= after_step and time.time() < deadline:
+        # a step BEHIND the brain's last one means the session was reset: answer at once, don't wait to catch up
+        while L.brain_state["step"] == after_step and time.time() < deadline:
             L.cond.wait(timeout=max(0.0, deadline - time.time()))
-        if L.brain_state["step"] <= after_step:
+        if L.brain_state["step"] == after_step:
             return Response(status_code=204)
         st = L.brain_state
     return J(st)
