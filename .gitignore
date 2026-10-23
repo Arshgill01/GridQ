@@ -7,3 +7,4 @@ esp32/clinic_node/secrets.h
 .pytest_cache/
 .DS_Store
 build/
+data/bench/*.log
