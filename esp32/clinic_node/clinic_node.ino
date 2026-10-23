@@ -42,6 +42,7 @@ volatile bool sensorReady = false;
 char sensorKind[8] = "";
 float sensorValue = 0;
 volatile long lastSeq = -1;
+volatile int lastHttp = 0;
 
 LiquidCrystal_I2C* lcd = nullptr;
 Servo servo;
@@ -142,6 +143,7 @@ void netTask(void*) {
       http.setTimeout(1500);
       http.begin(url("/api/node/clinic"));
       int code = http.GET();
+      lastHttp = code;
       bool ok = false;
       if (code == 200) {
         JsonDocument doc;
@@ -227,8 +229,11 @@ void loop() {
     float cm = us ? us / 58.0f : 999.0f;
     bool valid = cm >= 2.0f;                       // HC-SR04 minimum range: shorter echoes are noise/wiring
     static unsigned long tDbg = 0;
-    if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d link=%s\n", us, cm, valid ? "" : "(invalid)", WiFi.status(), linkLost ? "LOST" : "ok"); }
-    if (valid && cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; if (valid) evArmed = true; }
+    if (now - tDbg >= 1000) { tDbg = now; Serial.printf("us=%lu cm=%.1f %s wifi=%d ip=%s host=%s http=%d link=%s\n", us, cm, valid ? "" : "(invalid)",
+        WiFi.status(), WiFi.localIP().toString().c_str(), GRIDQ_HOST, lastHttp, linkLost ? "LOST" : "ok"); }
+    if (valid) {                                   // noise echoes are skipped, they neither count nor reset the streak
+      if (cm < EV_THRESHOLD_CM) evStreak++; else { evStreak = 0; evArmed = true; }
+    }
     if (evStreak >= EV_CONSECUTIVE && evArmed && now - lastEv >= EV_COOLDOWN_MS) {
       evArmed = false;      // rising edge only: re-arms when the bay clears
       lastEv = now;
