@@ -89,26 +89,10 @@ One rule organises the system: **whatever can crash is not in charge of safety.*
 
 ### One control step
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant MCU as STM32 MCU
-  participant IO as gridq-io
-  participant BR as gridq-brain
-  loop every step: 15 sim-minutes, 1 s of wall clock at 1×
-    IO->>MCU: get_status()
-    MCU-->>IO: mode, applied mask, grid cable, relay
-    IO->>IO: apply events, pick control (fresh plan, else SAFE rules), step the plant
-    IO->>MCU: set_outputs(load mask, safe mask, grid open, matrix bars, LEDs)
-    IO-->>BR: new state
-    BR->>BR: forecast P50/P90 + solar, build LP, HiGHS solve
-    BR->>IO: plan for the next 9 steps, then the priced "why"
-  end
-  par independent of solving
-    BR->>IO: heartbeat n, every 500 ms
-    IO->>MCU: hb(n), and only a NEW n feeds the watchdog
-  end
-```
+<p align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/control-step-dark.svg">
+  <img alt="One control step: gridq-io reads MCU status, applies events, chooses the plan or SAFE rules, steps the plant and sends outputs; the brain forecasts, solves the LP and posts the plan and explanations; independently, the brain heartbeats every 500 ms and io forwards each new value to the MCU." src="docs/img/control-step-light.svg" width="860">
+</picture></p>
 
 A failed solve reuses the last good plan for up to 2 hours (8 steps), then falls back to the SAFE rule controller. The plant never waits on the optimiser.
 
