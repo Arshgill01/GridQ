@@ -30,8 +30,9 @@ class QuantileForecaster(NaiveForecaster):
             y = np.concatenate([view.measured(f, k - HIST, k), np.full(SPD, np.nan)])
             X = F.build(y, origin, hs, sod, wd, work)
             m = self.models[f]
-            a = np.maximum(m["p50"].predict(X), 0.0)
-            b = m["p90"].predict(X) + m["off90"][np.minimum((hs - 1) // 24, 3)]
+            base = np.nan_to_num(X[:, F.BASE], nan=float(np.nanmean(y[:HIST])) if np.isfinite(y[:HIST]).any() else 0.0)
+            a = np.maximum((m["p50"].predict(X) if m["p50"] is not None else 0.0) + base, 0.0)
+            b = m["p90"].predict(X) + base + m["off90"][np.minimum((hs - 1) // 24, 3)]
             b = np.maximum(b, a)
             fc50 = np.empty(T)
             fc90 = np.empty(T)

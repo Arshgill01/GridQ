@@ -1,0 +1,97 @@
+{
+ "feeders": {
+  "hostel_a": {
+   "n_fit": 136596,
+   "n_cal": 98135,
+   "n_test": 63840,
+   "p50_mae_kw": 1.2869687983878226,
+   "naive_mae_kw": 1.3287130012531327,
+   "p90_coverage_raw_pct": 81.96115288220551,
+   "p90_coverage_pct": 89.9937343358396,
+   "p90_pinball": 0.33662842549712696,
+   "naive_p90_coverage_pct": 86.20457393483709,
+   "same_daytype_mae_kw": 1.3449275610902256,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    0.657,
+    0.727,
+    0.715,
+    0.777
+   ]
+  },
+  "hostel_b": {
+   "n_fit": 136612,
+   "n_cal": 98135,
+   "n_test": 63840,
+   "p50_mae_kw": 1.172126938741645,
+   "naive_mae_kw": 1.084764187030075,
+   "p90_coverage_raw_pct": 86.63377192982456,
+   "p90_coverage_pct": 91.19674185463658,
+   "p90_pinball": 0.24734347966030706,
+   "naive_p90_coverage_pct": 88.59179197994987,
+   "same_daytype_mae_kw": 1.1454509210526314,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    0.379,
+    0.374,
+    0.366,
+    0.317
+   ]
+  },
+  "academic": {
+   "n_fit": 136640,
+   "n_cal": 98135,
+   "n_test": 63840,
+   "p50_mae_kw": 0.7892862014705863,
+   "naive_mae_kw": 0.919760855263158,
+   "p90_coverage_raw_pct": 88.83771929824562,
+   "p90_coverage_pct": 87.84931077694236,
+   "p90_pinball": 0.22763796263660319,
+   "naive_p90_coverage_pct": 90.99937343358397,
+   "same_daytype_mae_kw": 0.9569781469298246,
+   "p50_source": "gbm",
+   "conformal_offsets_kw": [
+    -0.025,
+    -0.037,
+    -0.127,
+    -0.14
+   ]
+  }
+ },
+ "held_out": {
+  "p50_mae_kw": 1.0827939795333512,
+  "naive_mae_kw": 1.1110793478487886,
+  "p90_coverage_pct": 89.67992898913951,
+  "p90_pinball": 0.2705366225980125
+ },
+ "beats_naive": true,
+ "model": "HistGradientBoostingRegressor quantile 0.5/0.9 per feeder, direct multi-horizon, 17 causal features; P90 split-conformal on the last 45 training days",
+ "train_range": [
+  "2013-08-10",
+  "2017-11-30"
+ ],
+ "test_range": [
+  "2017-12-01",
+  "2017-12-31"
+ ],
+ "features": [
+  "h",
+  "tod_sin",
+  "tod_cos",
+  "weekday",
+  "weekend",
+  "workday",
+  "lag96",
+  "lag672",
+  "last1",
+  "last4",
+  "last96",
+  "dev_yday",
+  "lag96_ratio",
+  "lag_same",
+  "same_minus_96",
+  "yday_workday",
+  "base"
+ ],
+ "train_s": 27.102225065231323
+}

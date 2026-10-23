@@ -1,0 +1,44 @@
+{
+ "source": "I-BLEND (IIIT-Delhi), Rashid, Singh & Singh, Sci. Data 2019",
+ "feeders": {
+  "hostel_a": {
+   "meters": [
+    "boys_hostel_mains",
+    "boys_hostel_ups"
+   ],
+   "raw_p95_kw": 56.11,
+   "scale": 0.35643
+  },
+  "hostel_b": {
+   "meters": [
+    "girls_hostel_mains",
+    "girls_hostel_ups"
+   ],
+   "raw_p95_kw": 21.96,
+   "scale": 0.8195
+  },
+  "academic": {
+   "meters": [
+    "acad_build_mains"
+   ],
+   "raw_p95_kw": 58.79,
+   "scale": 0.42527
+  }
+ },
+ "resolution": "15 min means of 1-min samples, IST",
+ "units": "kW (scaled; real shape and day-to-day variation kept)",
+ "n_good_days": 877,
+ "train_range": [
+  "2013-08-10",
+  "2017-11-30"
+ ],
+ "test_range": [
+  "2017-12-01",
+  "2017-12-31"
+ ],
+ "n_train_days": 847,
+ "n_test_days": 30,
+ "min_day_coverage": 0.95,
+ "solar_site": "NASA POWER @ 28.5459, 77.2732 (IIIT-Delhi)",
+ "clinic": "modelled (no public data): 3.5 kW + 1 kW 08-20 + fridge cycling, x N(1, 0.03)"
+}

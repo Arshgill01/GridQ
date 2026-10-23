@@ -51,7 +51,7 @@ def rows(y, origins, sod, weekday, workday, all_h=False):
         h = RNG.integers(1, SPD, size=len(k))
     X = F.build(y, k, h, sod, weekday, workday)
     t = y[k + h]
-    ok = ~np.isnan(t) & ~np.isnan(X[:, F.FEATURES.index("lag96")])
+    ok = ~np.isnan(t) & ~np.isnan(X[:, F.FEATURES.index("lag96")]) & ~np.isnan(X[:, F.BASE])
     return X[ok], t[ok]
 
 
@@ -69,7 +69,7 @@ def main():
     test_days = sorted(set(full[split == "test"].normalize()))
     cal_days = set(train_days[-CAL_DAYS:])
     fit_days = set(train_days[:-CAL_DAYS])
-    is_day = lambda days: np.isin(full.normalize(), list(days))
+    is_day = lambda days: np.asarray(full.normalize().isin(list(days)))
     m_fit, m_cal, m_test = is_day(fit_days), is_day(cal_days), is_day(test_days)
     # origins: 8 per day (every 3 h) for fitting; every 4 steps for calibration / test
     first_ok = 7 * SPD + 1
@@ -88,34 +88,41 @@ def main():
         Xf, yf = rows(y, o_fit, sod, weekday, workday)
         kw = dict(max_iter=300, learning_rate=0.06, max_leaf_nodes=31, min_samples_leaf=80, l2_regularization=1.0,
                   random_state=0)
-        m50 = HistGradientBoostingRegressor(loss="quantile", quantile=0.5, **kw).fit(Xf, yf)
-        m90 = HistGradientBoostingRegressor(loss="quantile", quantile=0.9, **kw).fit(Xf, yf)
+        rf = yf - Xf[:, F.BASE]                       # residual over the calendar-aware naive base
+        m50 = HistGradientBoostingRegressor(loss="quantile", quantile=0.5, **kw).fit(Xf, rf)
+        m90 = HistGradientBoostingRegressor(loss="quantile", quantile=0.9, **kw).fit(Xf, rf)
         # split-conformal calibration of the P90 (one offset per horizon block of 6 h)
         Xc, yc = rows(y, o_cal, sod, weekday, workday, all_h=True)
-        q90c = m90.predict(Xc)
+        q90c = m90.predict(Xc) + Xc[:, F.BASE]
         hb = np.minimum((Xc[:, 0] - 1) // 24, 3).astype(int)
         off = np.zeros(4)
         for b in range(4):
             e = yc[hb == b] - q90c[hb == b]
             n = len(e)
             off[b] = np.quantile(e, min(1.0, 0.9 * (n + 1) / n)) if n else 0.0
+        # model selection on the CALIBRATION days (never the test days): GBM vs calendar-aware naive
+        p50c = m50.predict(Xc) + Xc[:, F.BASE]
+        use_model = bool(np.mean(np.abs(yc - p50c)) < np.mean(np.abs(yc - Xc[:, F.BASE])))
         Xt, yt = rows(y, o_test, sod, weekday, workday, all_h=True)
-        p50 = m50.predict(Xt)
+        p50 = m50.predict(Xt) + Xt[:, F.BASE] if use_model else Xt[:, F.BASE].copy()
         hbt = np.minimum((Xt[:, 0] - 1) // 24, 3).astype(int)
-        p90_raw = m90.predict(Xt)
+        p90_raw = m90.predict(Xt) + Xt[:, F.BASE]
         p90 = np.maximum(p90_raw + off[hbt], p50)
         naive = Xt[:, F.FEATURES.index("lag96")]
+        same = Xt[:, F.FEATURES.index("lag_same")]
+        r_same = float(np.nanmean(np.abs(yt - np.where(np.isnan(same), naive, same))))
         r = {"n_fit": int(len(yf)), "n_cal": int(len(yc)), "n_test": int(len(yt)),
              "p50_mae_kw": float(np.mean(np.abs(yt - p50))), "naive_mae_kw": float(np.mean(np.abs(yt - naive))),
              "p90_coverage_raw_pct": float(100 * np.mean(yt <= p90_raw)),
              "p90_coverage_pct": float(100 * np.mean(yt <= p90)), "p90_pinball": pinball(yt, p90, 0.9),
              "naive_p90_coverage_pct": float(100 * np.mean(yt <= naive * 1.2)),
+             "same_daytype_mae_kw": r_same, "p50_source": "gbm" if use_model else "calendar-naive (chosen on calibration days)",
              "conformal_offsets_kw": off.round(3).tolist()}
         report["feeders"][f] = r
-        models[f] = {"p50": m50, "p90": m90, "off90": off}
+        models[f] = {"p50": m50 if use_model else None, "p90": m90, "off90": off}
         all_y.append(yt); all_p50.append(p50); all_p90.append(p90); all_naive.append(naive)
         print(f"{f:9s} P50 MAE {r['p50_mae_kw']:.3f} kW vs naive {r['naive_mae_kw']:.3f} | "
-              f"P90 cover {r['p90_coverage_raw_pct']:.1f}% raw -> {r['p90_coverage_pct']:.1f}% calibrated")
+              f"P90 cover {r['p90_coverage_raw_pct']:.1f}% raw -> {r['p90_coverage_pct']:.1f}% calibrated | P50 {r['p50_source']}")
     Y, P50, P90, N = map(np.concatenate, (all_y, all_p50, all_p90, all_naive))
     held = {"p50_mae_kw": float(np.mean(np.abs(Y - P50))), "naive_mae_kw": float(np.mean(np.abs(Y - N))),
             "p90_coverage_pct": float(100 * np.mean(Y <= P90)), "p90_pinball": pinball(Y, P90, 0.9)}
