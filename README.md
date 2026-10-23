@@ -67,7 +67,7 @@ Every button on the dashboard's *Break it* console is a real fault injection. Th
 | **Cloud cover** | Solar × 0.3 for 2 h. The forecaster is **not told**; it notices from measurements. | Within about 1 sim-hour |
 | **E-rickshaw fleet** (or a hand under the ultrasonic sensor) | +30 kWh due by 06:00. The LP finds the cheapest slots: *"EV paused. Running it now costs ₹17 more. Deadline still met."* | Next step |
 | **Battery fault** | Capacity and power × 0.5; the plan adapts. | Next step |
-| **Stop the app / lose Wi-Fi** | The ESP32 clinic display shows `LINK LOST`, then rejoins Wi-Fi on its own. | ≤ 6 s |
+| **Stop the app / lose Wi-Fi** | The ESP32 clinic display shows `LINK LOST / CLINIC LOCAL ON`. It waits for GridQ without dropping Wi-Fi, and only rejoins if the radio itself has stalled. | `LINK LOST` in ≤ 6 s · relinks about 1 s after GridQ is back |
 
 <p align="center"><img alt="Break it console: grid outage rocker, cloud, EV fleet, battery fault and the KILL e-stop" src="docs/img/break-it.png" width="900"></p>
 
@@ -243,10 +243,12 @@ What we don't hide:
 | ESP32 DevKit | Clinic node, on Wi-Fi only (no shared wires with the UNO Q) |
 | 16×2 I2C LCD · SG90 servo · HC-SR04 | Clinic display · battery gauge · EV fleet arrival |
 
+The ESP32's **blue LED** (GPIO2; the red one is power) shows the link: **solid** = linked to GridQ · **slow blink** = on Wi-Fi, waiting for GridQ · **fast blink** = no Wi-Fi. While it waits, the LCD shows `CONNECTING WIFI` then `FINDING GRIDQ...`.
+
 | UNO Q pin | | ESP32 pin | |
 |---|---|---|---|
 | `D2` | relay IN (open-drain) | `GPIO21` / `GPIO22` | I2C SDA / SCL (LCD) |
-| `D3` | grid sense, `INPUT_PULLUP` | `GPIO18` | servo signal |
+| `D3` | grid sense, `INPUT_PULLUP` | `GPIO18` | SG90 servo signal (red → VIN 5 V, brown → GND) |
 | `D4` | buzzer + | `GPIO5` | HC-SR04 TRIG |
 | built-in | 8×13 LED matrix, LED3 (mode), LED4 (grid) | `GPIO19` | HC-SR04 ECHO **through a 1k/2k divider** |
 

@@ -65,3 +65,6 @@ with or without Linux.
 4. Expected: LCD line 1 `GRID OK   16:15`, line 2 cycles `SECURE …`, the top decision, and `BATT ..% PV ..kW`.
    The servo tracks battery SoC. A hand under the HC-SR04 (< 12 cm, 3 readings) fires one `ev_fleet` event.
    Stop the app on the UNO Q and the LCD shows `LINK LOST / CLINIC LOCAL ON` within 6 s.
+5. Blue LED (GPIO2): solid = linked · slow blink = on Wi-Fi, waiting for GridQ · fast blink = no Wi-Fi.
+   At power-up the LCD shows `CONNECTING WIFI`, then `FINDING GRIDQ...` until the UNO Q answers (about a
+   minute when both boards power up together: Linux boot plus app start). It relinks about 1 s after GridQ answers.

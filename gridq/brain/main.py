@@ -106,13 +106,14 @@ def run(io: str):
             log.warning("solve failed at %d: %s", k, res.status)
             continue
         try:
-            post(f"{io}/internal/plan", _clean(plan_payload(p, k, data, res, fc, mpc)), timeout=2)
+            post(f"{io}/internal/plan", _clean({**plan_payload(p, k, data, res, fc, mpc), "session": st.get("session")}),
+                 timeout=2)
         except NetErr:
             continue
         t0 = time.perf_counter()
         items = X.explain(p, data, res, k, budget_ok=res.solve_ms < 1500)
         try:
-            post(f"{io}/internal/explain", {"step": k, "items": _clean(items),
+            post(f"{io}/internal/explain", {"step": k, "session": st.get("session"), "items": _clean(items),
                                             "explain_ms": (time.perf_counter() - t0) * 1000}, timeout=2)
         except NetErr:
             pass

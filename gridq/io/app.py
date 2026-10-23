@@ -110,6 +110,7 @@ class Live:
         self.lock = threading.RLock()
         self.cond = threading.Condition(self.lock)
         self.events_q: list[dict] = []
+        self.session_no = 0                  # bumped on reset: plans solved for an earlier session are refused
         self.speed = 1.0
         self.paused = False
         self.plan: dict | None = None
@@ -162,7 +163,9 @@ class Live:
             self.last_cable = None
             self.last_result = None
             self.hist = {k: [] for k in ("k", "pv", "load", "grid", "soc", "dg", "batt", "price")}
+            self.session_no += 1
             self.brain_state = state_payload(tw, tw.observe(grid_up=True), T)
+            self.brain_state["session"] = self.session_no
             self.cond.notify_all()
             self._write_log({"type": "start", "step": tw.k, "date": date})
 
@@ -273,6 +276,7 @@ class Live:
                     h[key].pop(0)
             # brain input for the next step
             self.brain_state = state_payload(tw, tw.observe(grid_up=self.grid_up), T)
+            self.brain_state["session"] = self.session_no
             self.seq += 1
             self.cond.notify_all()
             snap = self.public_state()
@@ -519,6 +523,8 @@ def internal_state(after_step: int = -1):
 async def internal_plan(req: Request):
     pl = await req.json()
     with LIVE.lock:
+        if pl.get("session") != LIVE.session_no:          # solved before a reset: belongs to the old session
+            return {"ok": False, "stale": True}
         if LIVE.plan is None or pl["step"] >= LIVE.plan["step"]:
             LIVE.plan = pl
     return {"ok": True}
@@ -541,6 +547,8 @@ async def internal_hb(req: Request):
 async def internal_explain(req: Request):
     ex = await req.json()
     with LIVE.lock:
+        if ex.get("session") != LIVE.session_no:
+            return {"ok": False, "stale": True}
         if LIVE.explain is None or ex["step"] >= LIVE.explain["step"]:
             LIVE.explain = ex
     return {"ok": True}
