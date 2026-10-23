@@ -1,7 +1,8 @@
 # Pins and polarity. Answers to spec §19 open items are recorded here as they are verified.
 unoq:
   relay_pin: 2
-  relay_active_low: true       # VERIFY (§19.1); false if the BC547 inverter stage is used
+  relay_active_low: true       # §19.1: 5 V active-LOW module; false if the BC547 inverter stage is used
+  relay_open_drain: true       # 3.3 V HIGH can't release a 5 V active-LOW module: drive D2 open-drain (PB3 is 5 V tolerant)
   grid_cable_pin: 3
   buzzer_pin: 4
   buzzer_type: active          # VERIFY (§19.2): active | passive (use tone())

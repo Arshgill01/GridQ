@@ -19,6 +19,11 @@ const int RELAY_PIN = 2;
 const int CABLE_PIN = 3;
 const int BUZZER_PIN = 4;
 const bool RELAY_ACTIVE_LOW = true;     // set false if the BC547 inverter stage is used (§2.1)
+// 5 V active-LOW relay modules can't be released by a 3.3 V "HIGH" (1.7 V stays across the opto LED,
+// so the relay never drops out). Open-drain drive fixes it: OFF = pin floats (the module pulls IN to its
+// own 5 V), ON = pin sinks to GND. D2 is PB3, which is 5 V tolerant. Fail-safe: a reset/unpowered MCU
+// floats the pin, so the relay releases and the site stays on grid (COM-NC).
+const bool RELAY_OPEN_DRAIN = true;
 const bool BUZZER_PASSIVE = false;      // true -> drive with tone()
 const int BUZZER_HZ = 2700;
 
@@ -29,6 +34,7 @@ const unsigned long MATRIX_BOOT_HOLDOFF_MS = 30000;  // let the Linux boot logo 
 
 const int RELAY_ON = RELAY_ACTIVE_LOW ? LOW : HIGH;
 const int RELAY_OFF = RELAY_ACTIVE_LOW ? HIGH : LOW;
+
 
 // ---------------------------------------------------------------- state
 enum Mode { MODE_NORMAL, MODE_SAFE };
@@ -182,12 +188,26 @@ void drawFrame(unsigned long now) {
   }
 }
 
+// ---------------------------------------------------------------- relay drive
+void relayWrite(bool energise) {
+  if (RELAY_OPEN_DRAIN && RELAY_ACTIVE_LOW) {
+    if (energise) { digitalWrite(RELAY_PIN, LOW); pinMode(RELAY_PIN, OUTPUT); digitalWrite(RELAY_PIN, LOW); }
+    else { pinMode(RELAY_PIN, INPUT); }        // high-Z: module pull-up releases the relay
+  } else {
+    digitalWrite(RELAY_PIN, energise ? RELAY_ON : RELAY_OFF);
+  }
+}
+
 // ---------------------------------------------------------------- setup / loop
 void setup() {
   // Relay OFF level BEFORE pinMode(OUTPUT): no glitch that islands the site at boot.
-  digitalWrite(RELAY_PIN, RELAY_OFF);
-  pinMode(RELAY_PIN, OUTPUT);
-  digitalWrite(RELAY_PIN, RELAY_OFF);
+  if (RELAY_OPEN_DRAIN && RELAY_ACTIVE_LOW) {
+    pinMode(RELAY_PIN, INPUT);                 // released from the first instruction
+  } else {
+    digitalWrite(RELAY_PIN, RELAY_OFF);
+    pinMode(RELAY_PIN, OUTPUT);
+    digitalWrite(RELAY_PIN, RELAY_OFF);
+  }
   pinMode(CABLE_PIN, INPUT_PULLUP);
   pinMode(BUZZER_PIN, OUTPUT);
   buzz(false);
@@ -225,11 +245,11 @@ void loop() {
   bool wantOpen = !cablePresent || gridOpenCmd == 1;
   if (wantOpen) {
     recloseOkSince = 0;
-    if (!relayEnergised) { relayEnergised = true; digitalWrite(RELAY_PIN, RELAY_ON); pendingRelayChirp = true; }
+    if (!relayEnergised) { relayEnergised = true; relayWrite(true); pendingRelayChirp = true; }
   } else if (relayEnergised) {
     if (recloseOkSince == 0) recloseOkSince = now ? now : 1;
     if (now - recloseOkSince >= RECLOSE_DELAY_MS) {
-      relayEnergised = false; digitalWrite(RELAY_PIN, RELAY_OFF); pendingRelayChirp = true; recloseOkSince = 0;
+      relayEnergised = false; relayWrite(false); pendingRelayChirp = true; recloseOkSince = 0;
     }
   }
 
