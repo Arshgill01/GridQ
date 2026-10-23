@@ -240,6 +240,23 @@ class Twin:
                 out[lo - k0:b - k0] = pre[len(pre) + lo:len(pre) + b]
         return out
 
+    # ---- the "view" interface the MPC/forecasters read through (the brain rebuilds it from JSON)
+    def clear(self, k0: int, k1: int) -> np.ndarray:
+        """Clear-sky PV (deterministic, known ahead). Steps before the run use the same time of day."""
+        idx = np.arange(k0, k1)
+        return self.tl.pv_clear[np.where(idx >= 0, idx, idx % SPD)]
+
+    def tariff_slice(self, k0: int, k1: int) -> np.ndarray:
+        return self.tl.tariff[k0:k1]
+
+    def future_sessions(self, k: int, T: int) -> list[dict]:
+        return [s.to_dict() for s in self.future if s.start < k + T]
+
+    def fair_today(self, k: int) -> dict:
+        d0 = k - (k % SPD)
+        return {l: {"shed_kwh": float(np.sum(self.rec[f"dem_{l}"][d0:k] - self.rec[f"srv_{l}"][d0:k]) * DT),
+                    "dem_kwh": float(np.sum(self.rec[f"dem_{l}"][d0:k]) * DT)} for l in FAIR}
+
     def sched_grid_up(self) -> bool:
         return bool(self.tl.grid_sched[self.k]) and not self.software_outage
 

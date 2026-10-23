@@ -14,7 +14,10 @@ def jain(x) -> float:
 
 
 def day_metrics(p: dict, rec: dict, day: int) -> dict:
-    a, b = day * SPD, (day + 1) * SPD
+    return range_metrics(p, rec, day * SPD, (day + 1) * SPD)
+
+
+def range_metrics(p: dict, rec: dict, a: int, b: int) -> dict:
     r = {k: v[a:b] for k, v in rec.items()}
     d = p["diesel"]
     wear = p["battery"]["wear_rs_per_kwh"]

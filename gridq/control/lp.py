@@ -52,6 +52,8 @@ class LPData:
     reserve_kwh: float = 0.0             # 0 disables the reserve constraint
     branches: list = field(default_factory=list)
     fair_minmax: dict | None = None      # {"shed_kwh": {l}, "dem_kwh": {l}, "rs": float}
+    force_p0: dict = field(default_factory=dict)   # counterfactual: load -> kW it must draw at t=0
+    noshed0: list = field(default_factory=list)    # counterfactual: loads that may not be shed at t=0
 
 
 @dataclass
@@ -208,6 +210,14 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
         r = np.arange(T)
         B.rows_("ub", T, [(r, tr["soc"], -1), (r, gap, -1)], -d.reserve_kwh)
         tr["gap"] = gap
+    # counterfactual forcing (explanations)
+    for f, kw in d.force_p0.items():
+        terms = [(np.array([0]), np.array([idx[0]]), -1) for j, (ts, idx) in tr["p"].items()
+                 if d.sessions[j]["load"] == f and ts[0] == 0]
+        if terms:
+            B.rows_("ub", 1, terms, -kw)
+    for l in d.noshed0:
+        B._noshed = getattr(B, "_noshed", []) + [tr[f"shed_{l}"][0]]
     # terminal value on trunk
     B.add_cost(tr["soc"][-1], -tv)
     # min-max fairness over today's remaining steps
@@ -277,6 +287,8 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
     for idx, val in B._cost_adj:
         np.add.at(c, idx, val)
     bounds = np.column_stack([np.concatenate(B.lb), np.concatenate(B.ub)])
+    for i in getattr(B, "_noshed", []):
+        bounds[i, 1] = 0.0
     mats = B.matrices()
     A_eq, b_eq = mats["eq"]
     A_ub, b_ub = mats["ub"]

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GridQ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="row1">
+    <div class="brand">Grid<b>Q</b></div>
+    <div class="badge" title="The solar, battery, diesel and feeders are a simulated plant driven by real I-BLEND demand and NASA POWER solar data. The controller, optimizer, MCU supervisor and physical I/O are real.">SIMULATED PLANT · REAL CONTROLLER</div>
+  </div>
+  <div class="row2">
+    <span class="pill" id="h-clock">--:--</span>
+    <span class="pill" id="h-band">—</span>
+    <span class="pill mode" id="h-mode">—</span>
+    <span class="pill" id="h-grid">grid —</span>
+    <span class="pill" id="h-brain">brain —</span>
+    <span class="pill mono" id="h-solve">— ms</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab on" data-tab="live">Live</button>
+  <button class="tab" data-tab="plan">Plan</button>
+  <button class="tab" data-tab="break">Break it</button>
+  <button class="tab" data-tab="proof">Proof</button>
+  <button class="tab" data-tab="replay">Replay</button>
+</nav>
+
+<main>
+  <!-- LIVE -->
+  <section id="tab-live" class="panel on">
+    <div class="hero">
+      <div class="hero-main">
+        <div class="hero-label">Clinic secure for</div>
+        <div class="hero-value" id="survival">—</div>
+        <div class="hero-sub">grid down from now · clinic only · P90 demand · PV, then battery, then diesel</div>
+      </div>
+      <div class="hero-side">
+        <div class="hero-label">Energy is worth</div>
+        <div class="hero-value small" id="price">—</div>
+        <div class="hero-sub">shadow price of the bus right now (LP dual)</div>
+      </div>
+    </div>
+
+    <div class="flow">
+      <div class="sources">
+        <div class="src" id="src-pv"><span class="k">Solar</span><span class="v">—</span></div>
+        <div class="src" id="src-grid"><span class="k">Grid</span><span class="v">—</span></div>
+        <div class="src" id="src-batt"><span class="k">Battery</span><span class="v">—</span>
+          <div class="socbar"><div class="socfill" id="socfill"></div><div class="socfloor" id="socfloor"></div></div>
+        </div>
+        <div class="src" id="src-dg"><span class="k">Diesel</span><span class="v">—</span></div>
+      </div>
+      <div class="bus"><div class="bus-line"></div><div class="bus-label">BUS</div></div>
+      <div class="feeders" id="feeders"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Why, right now</div>
+      <div id="why-live" class="why"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Last 24 h (actual)</div>
+      <div id="chart-hist" class="chart"></div>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section id="tab-plan" class="panel">
+    <div class="card">
+      <div class="card-h">Next 24 h plan <span class="muted" id="plan-meta"></span></div>
+      <div id="chart-plan" class="chart tall"></div>
+      <div class="legend" id="plan-legend"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Why cards</div>
+      <div id="why-plan" class="why"></div>
+    </div>
+  </section>
+
+  <!-- BREAK IT -->
+  <section id="tab-break" class="panel">
+    <div class="grid-btn">
+      <button class="big danger" data-ev="grid_outage" id="b-outage">Grid outage<small>toggle</small></button>
+      <button class="big" data-ev="cloud">Cloud cover<small>PV ×0.3 for 2 h · not told to the forecaster</small></button>
+      <button class="big" data-ev="ev_fleet">E-rickshaw fleet<small>+30 kWh by 06:00</small></button>
+      <button class="big" data-ev="battery_fault">Battery fault<small>capacity & power ×0.5</small></button>
+      <button class="big danger" id="b-kill">Kill the brain<small>SIGKILL · MCU must go SAFE in &lt;3.5 s</small></button>
+      <button class="big ghost" id="b-cable" hidden>Pull cable (laptop mock)<small>real board: pull the jumper</small></button>
+    </div>
+    <div class="card">
+      <div class="card-h">Live sensors</div>
+      <label class="toggle"><input type="checkbox" id="t-sky"> Live sky (BH1750 lux scales PV)</label>
+      <label class="toggle"><input type="checkbox" id="t-heat"> Heat (BMP280 temperature scales hostel demand)</label>
+      <div class="muted" id="sensor-last"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Sim clock</div>
+      <div class="seg" id="speeds">
+        <button data-x="0.5">0.5×</button><button data-x="1">1×</button><button data-x="2">2×</button><button data-x="4">4×</button>
+      </div>
+      <div class="seg">
+        <button id="b-pause">Pause</button><button id="b-step">Step</button><button id="b-reset" class="danger">Reset</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h">Event log</div>
+      <ol id="events" class="events"></ol>
+    </div>
+  </section>
+
+  <!-- PROOF -->
+  <section id="tab-proof" class="panel">
+    <div class="card headline">
+      <div class="hl-big" id="captured">—</div>
+      <div class="hl-sub" id="captured-sub">of the achievable saving captured (B1 → Oracle), held-out report days</div>
+    </div>
+    <div class="card">
+      <div class="card-h">Report days: median per scenario-day <span class="muted">(min – max)</span></div>
+      <div class="table-wrap"><table id="proof-table"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Total cost of service per scenario-day</div>
+      <div id="chart-days" class="chart tall"></div>
+      <div class="legend" id="days-legend"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Forecast quality (held-out days)</div>
+      <div id="forecast-card"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Provenance</div>
+      <div id="provenance" class="muted"></div>
+    </div>
+  </section>
+
+  <!-- REPLAY -->
+  <section id="tab-replay" class="panel">
+    <div class="card">
+      <div class="card-h">Replay this session against the baseline</div>
+      <p class="muted">Re-runs everything you did since the last reset (same start, same events, same grid outages) headless through the inverter default (B0) and through GridQ.</p>
+      <button class="big" id="b-replay">Replay this session</button>
+      <div id="replay-out"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot" id="foot"></footer>
+<script src="app.js"></script>
+</body>
+</html>

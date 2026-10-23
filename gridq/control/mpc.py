@@ -54,10 +54,9 @@ class MPC(Controller):
             if s["remaining"] > 1e-9:
                 out.append(dict(load=s["load"], a=max(0, s["start"] - k), d=s["deadline"] - k,
                                 R=s["remaining"], p_max=s["p_max"], id=s["id"]))
-        for s in tw.future:
-            if s.start >= k + T:
-                break
-            out.append(dict(load=s.load, a=s.start - k, d=s.deadline - k, R=s.energy, p_max=s.p_max, id=s.id))
+        for s in tw.future_sessions(k, T):
+            out.append(dict(load=s["load"], a=s["start"] - k, d=s["deadline"] - k, R=s["energy"],
+                            p_max=s["p_max"], id=s["id"]))
         return out
 
     def branches(self, obs, T):
@@ -95,17 +94,17 @@ class MPC(Controller):
             for l in FAIR:
                 burden[l] = 1.0 + m["fairness_burden_per_hour"] * obs.shed_minutes[l] / 60.0
         elif m["fairness"] == "minmax":
-            d0 = k - (k % SPD)
-            shed = {l: float(np.sum(tw.rec[f"dem_{l}"][d0:k] - tw.rec[f"srv_{l}"][d0:k]) * DT) for l in FAIR}
+            ft = tw.fair_today(k)
             today = day_of == 0
-            dem = {l: float(np.sum(tw.rec[f"dem_{l}"][d0:k]) * DT + np.sum(p50[l][today]) * DT) for l in FAIR}
+            shed = {l: ft[l]["shed_kwh"] for l in FAIR}
+            dem = {l: ft[l]["dem_kwh"] + float(np.sum(p50[l][today]) * DT) for l in FAIR}
             fair_minmax = {"shed_kwh": shed, "dem_kwh": dem, "rs": m["fairness_minmax_rs"]}
         reserve = 0.0
         if m["reserve_mode"] == "p90" and not self.oracle:
             H = int(m["reserve_hours_clinic"] / DT)
             reserve = float(np.mean(p90["clinic"][:H])) * m["reserve_hours_clinic"]
         data = lp.LPData(
-            T=T, pv=pv, dem={l: np.maximum(p50[l], 0.0) for l in INFLEX}, tariff=tw.tl.tariff[k:k + T],
+            T=T, pv=pv, dem={l: np.maximum(p50[l], 0.0) for l in INFLEX}, tariff=tw.tariff_slice(k, k + T),
             grid_cap=self.grid_cap(obs, tw, T), day_of=day_of,
             soc0=obs.soc, soc_min=obs.soc_min, soc_max=obs.soc_max, p_ch=obs.p_ch_max, p_dis=obs.p_dis_max,
             tank0=obs.tank_l, sessions=self.sessions(obs, tw, T), burden=burden,
