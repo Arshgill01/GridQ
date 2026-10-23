@@ -40,13 +40,6 @@ class MPC(Controller):
         pv = forecast_pv(tw, k, T, obs.pv_now)
         return p50, p90, pv
 
-    def grid_cap(self, obs, tw, T):
-        lim = self.p["grid"]["import_limit_kw"]
-        cap = np.full(T, float(lim))
-        if not obs.grid_up:
-            cap[: max(1, self.p["mpc"]["outage_assumed_remaining_steps"])] = 0.0
-        return cap
-
     def sessions(self, obs, tw, T):
         k = obs.k
         out = []
@@ -59,11 +52,46 @@ class MPC(Controller):
                             p_max=s["p_max"], id=s["id"]))
         return out
 
+    def _remaining_outage(self, elapsed: int):
+        """Remaining-duration quantiles of an ongoing outage, from the outage statistics
+        (duration ~ U[d0, d1] minutes, conditioned on having lasted `elapsed` steps)."""
+        d0, d1 = (x / 15 for x in self.p["outages"]["duration_min_range"])
+        lo = max(d0, elapsed + 1)
+        hi = max(d1, lo)
+        return lambda q: max(1, int(np.ceil(lo + q * (hi - lo) - elapsed)))
+
+    def grid_cap(self, obs, tw, T):
+        lim = self.p["grid"]["import_limit_kw"]
+        cap = np.full(T, float(lim))
+        if not obs.grid_up:
+            sc = self.p["mpc"]["scenarios"]
+            if sc.get("enabled"):
+                n = self._remaining_outage(obs.outage_elapsed)(0.25)      # trunk: optimistic quartile
+            else:
+                n = self.p["mpc"]["outage_assumed_remaining_steps"]
+            cap[: max(1, n)] = 0.0
+        return cap
+
     def branches(self, obs, T):
         sc = self.p["mpc"]["scenarios"]
-        if not sc.get("enabled") or not obs.grid_up:
+        if not sc.get("enabled"):
             return []
         lim = self.p["grid"]["import_limit_kw"]
+        if not obs.grid_up:
+            # ongoing outage: the trunk restores at the optimistic quartile; branches stay dark longer.
+            # They diverge exactly when the trunk's restoration would (or would not) be observed.
+            rem = self._remaining_outage(obs.outage_elapsed)
+            tau = rem(0.25)
+            out = []
+            for q_mid, w in ((0.5, 0.25), (0.75, 0.25), (1.0, 0.25)):
+                r = rem(q_mid)
+                if r <= tau or tau >= T:
+                    continue
+                end = min(T, r + sc["max_branch_steps"] // 2)
+                cap = np.full(end - tau, float(lim))
+                cap[:r - tau] = 0.0
+                out.append(lp.Branch(tau=tau, end=end, cap=cap, weight=w))
+            return out
         starts = [s for s in sc["branch_starts"] if s < T]
         haz = self.hazard[(obs.k + np.arange(T + 1)) % SPD]
         cum = np.concatenate([[0.0], np.cumsum(haz)])

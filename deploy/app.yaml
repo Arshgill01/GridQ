@@ -1,0 +1,6 @@
+name: GridQ
+description: "Offline edge energy controller: twin + MPC + safety supervisor (SIMULATED PLANT, REAL CONTROLLER)"
+icon: ⚡
+ports:
+  - 8000
+bricks: []
