@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GridQ · Project Description</title>
+<style>
+/* One A4 page, printed by tools/build_onepager.sh. Dispatch-panel identity from the dashboard: enamel and ink,
+   condensed display type, monospaced readouts. */
+@font-face { font-family: "Archivo"; font-weight: 400 700; font-stretch: 75% 100%; src: url(../../web/fonts/archivo.woff2) format("woff2"); }
+@font-face { font-family: "Big Shoulders Display"; font-weight: 500 800; src: url(../../web/fonts/big-shoulders-display.woff2) format("woff2"); }
+@font-face { font-family: "Martian Mono"; font-weight: 400 600; font-stretch: 75% 112.5%; src: url(../../web/fonts/martian-mono.woff2) format("woff2"); }
+:root {
+  --ink: #1b1d1a; --ink2: #44463f; --muted: #6f6f64; --line: #cfc8b8; --panel: #f4f0e7; --enamel: #e8e2d5;
+  --ok: #1d7a49; --alarm: #c4311b; --warn: #b47800; --gq: #2a6fd0;
+  --disp: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Martian Mono", Menlo, monospace;
+}
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); }
+body { font: 400 8.3pt/1.36 var(--body); font-stretch: 92%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.page { width: 210mm; height: 297mm; padding: 9.5mm 11mm 7.5mm; display: flex; flex-direction: column; gap: 3mm; overflow: hidden; }
+h1, h2, h3 { margin: 0; font-family: var(--disp); letter-spacing: .03em; }
+p { margin: 0; }
+b { font-weight: 650; }
+.mono { font-family: var(--mono); font-stretch: 75%; font-variant-numeric: tabular-nums; }
+
+/* masthead */
+.mast { display: grid; grid-template-columns: auto 1fr; gap: 6mm; align-items: end; border-bottom: 2.2pt solid var(--ink); padding-bottom: 2.4mm; }
+.brand { font: 800 40pt/0.82 var(--disp); letter-spacing: .05em; display: flex; align-items: center; gap: 3mm; }
+.brand b { color: var(--ok); font-weight: 800; }
+.mark { width: 8.5mm; height: 8.5mm; border: 2.4pt solid var(--ink); border-radius: 50%; position: relative; }
+.mark::after { content: ""; position: absolute; left: 50%; top: -2.6mm; bottom: -2.6mm; width: 2.4pt; background: var(--ink); transform: translateX(-50%); }
+.mast-r { display: flex; flex-direction: column; gap: 1.2mm; align-items: flex-end; text-align: right; }
+.event { font: 600 7pt/1 var(--mono); font-stretch: 75%; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.thesis { font: 600 11.2pt/1.25 var(--body); font-stretch: 88%; max-width: 128mm; }
+.plate { display: inline-block; background: #d9b44a; color: #2b2410; font: 700 6.6pt/1 var(--mono); font-stretch: 75%; letter-spacing: .14em; padding: 1.3mm 2.4mm; border-radius: 1mm; }
+
+/* sections */
+.sec-h { font: 700 7pt/1 var(--mono); font-stretch: 75%; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); display: flex; gap: 2mm; align-items: center; margin-bottom: 1.5mm; }
+.sec-h::after { content: ""; flex: 1; height: .6pt; background: var(--line); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+.lede p + p { margin-top: 1.2mm; }
+
+/* the three stages */
+.stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+.stage { background: var(--panel); border: .6pt solid var(--line); border-radius: 1.4mm; padding: 2.6mm 3mm; display: flex; flex-direction: column; gap: 1.2mm; }
+.stage h3 { font-size: 13pt; font-weight: 800; line-height: 1; display: flex; gap: 2mm; align-items: baseline; }
+.stage h3 span { font: 600 7pt/1 var(--mono); font-stretch: 75%; color: var(--muted); }
+.stage ul { margin: 0; padding-left: 3.4mm; display: grid; gap: .7mm; }
+.stage li::marker { color: var(--muted); }
+.stage .kpi { margin-top: auto; padding-top: 1.1mm; border-top: .6pt dashed var(--line); font: 650 7.6pt/1.3 var(--body); font-stretch: 85%; font-variant-numeric: tabular-nums; color: var(--ink2); }
+
+/* results */
+.results { display: grid; grid-template-columns: 1.25fr 1fr; gap: 5mm; align-items: start; }
+table { width: 100%; border-collapse: collapse; font-size: 8.2pt; }
+th { font: 600 6.4pt/1.2 var(--mono); font-stretch: 75%; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 1.5mm 1mm; border-bottom: 1.2pt solid var(--ink); }
+td { padding: 1.05mm 1.5mm; border-bottom: .5pt solid var(--line); }
+td.n, th.n { text-align: right; font-family: var(--mono); font-stretch: 75%; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.gq td { background: #e3ecf9; font-weight: 650; }
+tr.gq td:first-child { box-shadow: inset 1.2mm 0 0 var(--gq); }
+.small { font-size: 7.2pt; color: var(--muted); line-height: 1.35; margin-top: 1.4mm; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
+.kpi-t { border: .6pt solid var(--line); border-radius: 1.2mm; padding: 1.8mm 2.4mm 2mm; }
+.kpi-t .v { font: 800 21pt/0.95 var(--disp); letter-spacing: .01em; }
+.kpi-t .v small { font-size: 12pt; }
+.kpi-t .l { font-size: 7.3pt; line-height: 1.25; color: var(--ink2); margin-top: .6mm; }
+.v.ok { color: var(--ok); } .v.gq { color: var(--gq); }
+
+/* architecture flow + demo strip */
+.flow { display: grid; grid-template-columns: 1fr 8mm 2.25fr 9mm 1.1fr 7mm 0.95fr; align-items: stretch; }
+.node { border: .8pt solid var(--ink); border-radius: 1.2mm; padding: 1.6mm 2.2mm; background: #fff; font-size: 7.6pt; line-height: 1.3; }
+.node h4 { margin: 0 0 .6mm; font: 800 9.6pt/1 var(--disp); letter-spacing: .04em; }
+.node.grp { background: var(--panel); border-color: var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; padding: 1.6mm; }
+.node.grp > .node { border-width: .7pt; }
+.node .grp-l { grid-column: 1 / -1; font: 600 6.2pt/1 var(--mono); font-stretch: 75%; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.node.kill { border-style: dashed; }
+.node.safe { border-color: var(--ok); box-shadow: inset 0 0 0 .5pt var(--ok); }
+.wire { display: flex; flex-direction: column; align-items: center; justify-content: center; font: 600 6.2pt/1.1 var(--body); font-stretch: 80%; color: var(--muted); text-align: center; position: relative; }
+.wire::before { content: "⇄"; font: 400 11pt/1 var(--body); color: var(--ink2); }
+.wire.out::before { content: "→"; }
+.demo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+.demo div { border-top: 1.2pt solid var(--alarm); padding-top: 1.2mm; }
+.demo dt { font: 700 7.6pt/1.2 var(--mono); font-stretch: 75%; color: var(--alarm); margin-bottom: .5mm; }
+.demo dd { margin: 0; font-size: 7.8pt; line-height: 1.32; }
+
+/* foot */
+.bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+.honest { display: grid; grid-template-columns: auto 1fr; gap: .9mm 2.4mm; font-size: 8pt; }
+.chip { font: 700 6.2pt/1 var(--mono); font-stretch: 75%; letter-spacing: .1em; padding: .9mm 1.4mm; border: .7pt solid currentColor; border-radius: .8mm; height: fit-content; margin-top: .4mm; }
+.chip.real { color: var(--ok); } .chip.sim { color: var(--warn); }
+.foot { margin-top: auto; border-top: 1.2pt solid var(--ink); padding-top: 1.6mm; display: flex; justify-content: space-between; gap: 4mm; font: 400 7.2pt/1.2 var(--body); font-stretch: 85%; color: var(--ink2); white-space: nowrap; }
+.foot b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="mast">
+    <div class="brand"><span class="mark" aria-hidden="true"></span>GRID<b>Q</b></div>
+    <div class="mast-r">
+      <div class="event">Hack-O-Octo 4.0 · PS08 · Energy for the Next Billion</div>
+      <p class="thesis">An offline energy brain for a campus microgrid with a clinic on it. It forecasts, optimises and explains every 15 minutes on an Arduino UNO Q, and it keeps the clinic powered when its own software fails.</p>
+      <span class="plate">SIMULATED PLANT · REAL CONTROLLER</span>
+    </div>
+  </header>
+
+  <section class="two lede">
+    <div>
+      <div class="sec-h">The problem</div>
+      <p>Campuses and health centres on weak grids run solar, a battery and a diesel genset on fixed rules: <i>charge at noon, discharge in the evening, start the genset below 20%</i>. Rules can't see tomorrow's demand, can't tell that an outage at 19:00 costs more than one at 03:00, and can't weigh ₹27/kWh diesel against cutting a hostel. When the controller crashes, nobody is in charge.</p>
+    </div>
+    <div>
+      <div class="sec-h">What GridQ does</div>
+      <p>GridQ replaces the rules with an <b>optimiser that prices every choice in rupees</b>: grid, battery, diesel, deferring an EV or pump, trimming a feeder. It plans 24 hours ahead against the grid failing, applies the next 15 minutes, and explains each decision. A <b>microcontroller that doesn't trust the optimiser</b> holds the safety layer.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h">How it works</div>
+    <div class="stages">
+      <div class="stage">
+        <h3><span>01</span>Forecast</h3>
+        <ul>
+          <li>Quantile gradient-boosted trees: a P50 and a P90 per feeder, 24 h ahead in one call.</li>
+          <li>17 causal features incl. the campus working-day calendar; P90 split-conformal calibrated.</li>
+          <li>Solar: clear-sky × measured clearness, so it catches clouds nobody announced.</li>
+        </ul>
+        <div class="kpi">P90 coverage 90.0% held-out · solar error 0.26 vs 0.48 kW for persistence</div>
+      </div>
+      <div class="stage">
+        <h3><span>02</span>Optimise</h3>
+        <ul>
+          <li>A linear program on HiGHS, re-solved every 15 min as <b>MPC</b>: 24 h of battery physics, a 40 kW cap, fuel, deadlines, fair shedding.</li>
+          <li><b>Outage fan tree</b>: plans against the grid failing at +15 min…+4 h, weighted by real outage statistics, with non-anticipativity.</li>
+          <li>Every "why" is a re-solve or an LP dual: <i>"EV paused, running it now costs ₹17 more."</i></li>
+        </ul>
+        <div class="kpi">5,837 variables · 1,557 constraints · 48 ms median laptop, ~0.1 s on UNO Q</div>
+      </div>
+      <div class="stage">
+        <h3><span>03</span>Fail safe</h3>
+        <ul>
+          <li>The optimiser is a separate, killable process and the <b>only</b> source of heartbeats.</li>
+          <li>The STM32 MCU goes SAFE (clinic + pump only) 3 s after the last <i>new</i> heartbeat.</li>
+          <li>The MCU trips the grid relay from the grid-sense pin itself, with no Linux in the loop. The relay is wired fail-safe.</li>
+        </ul>
+        <div class="kpi">KILL → SAFE in &lt; 3.5 s · local trip, 50 ms debounce · reclose after 5 s</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h">Results on held-out real data</div>
+    <div class="results">
+      <div>
+        <table>
+          <thead><tr><th>Dec 2017 · 100 days</th><th class="n">Total cost</th><th class="n">Unserved</th><th class="n">Clinic</th><th class="n">Fairness</th></tr></thead>
+          <tbody>
+            <tr><td>B0 · inverter default</td><td class="n">₹7,83,106</td><td class="n">1,489 kWh</td><td class="n">100%</td><td class="n">0.38</td></tr>
+            <tr><td>B1 · tuned time-of-day rules</td><td class="n">₹8,05,486</td><td class="n">1,335 kWh</td><td class="n">100%</td><td class="n">0.44</td></tr>
+            <tr class="gq"><td>GridQ</td><td class="n">₹7,67,968</td><td class="n">317 kWh</td><td class="n">100%</td><td class="n">1.00</td></tr>
+            <tr><td>Oracle · perfect foresight</td><td class="n">₹7,48,038</td><td class="n">17 kWh</td><td class="n">100%</td><td class="n">1.00</td></tr>
+          </tbody>
+        </table>
+        <p class="small">Real I-BLEND campus demand (IIIT-Delhi) and NASA POWER solar on days the forecaster never saw, each with 5 random outage patterns. Tuned on days 1–10, reported on 11–30. Total cost = energy + diesel + demand charge + battery wear + value of lost load. Fairness = Jain index.</p>
+      </div>
+      <div class="kpis">
+        <div class="kpi-t"><div class="v gq">43<small>%</small></div><div class="l">of the achievable saving captured vs the stronger baseline; 65% vs B1 (the spec's measure)</div></div>
+        <div class="kpi-t"><div class="v ok">−79<small>%</small></div><div class="l">unserved energy vs B0, shared fairly instead of always cutting one hostel</div></div>
+        <div class="kpi-t"><div class="v gq">93<small>%</small></div><div class="l">captured in the summer stress block, when the 40 kW grid cap binds</div></div>
+        <div class="kpi-t"><div class="v">67.5<small>%</small></div><div class="l">captured by the outage fan tree on tune days; the spec's fixed clinic reserve scored −38.6%</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h">Architecture · whatever can crash is not in charge of safety</div>
+    <div class="flow">
+      <div class="node"><h4>ESP32 clinic node</h4>LCD: grid, clinic secure hours, the LP's reasoning · servo battery gauge · ultrasonic EV sensor</div>
+      <div class="wire">Wi-Fi<br>1 Hz</div>
+      <div class="node grp">
+        <span class="grp-l">Arduino UNO Q · Linux (QRB2210)</span>
+        <div class="node"><h4>gridq-io</h4>Always on: plant twin, dashboard, event log, sole owner of the MCU link, respawns the brain</div>
+        <div class="node kill"><h4>gridq-brain</h4>Killable: forecast → LP → explain, re-plans every step; heartbeat every 500 ms</div>
+      </div>
+      <div class="wire">Bridge<br>RPC</div>
+      <div class="node safe"><h4>STM32 MCU</h4>Authority for outputs: 3 s heartbeat watchdog → SAFE · local grid trip</div>
+      <div class="wire out">pins</div>
+      <div class="node"><h4>Field</h4>D3 grid sense · D2 relay (fail-safe) · LED matrix · buzzer</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-h">Break it, live</div>
+    <dl class="demo">
+      <div><dt>Pull the D3 jumper</dt><dd>The MCU islands the site by itself: relay clicks, buzzer sounds. The LP re-plans on battery + diesel and trims by price, with the clinic last.</dd></div>
+      <div><dt>Press KILL</dt><dd>SIGKILL the optimiser. Heartbeats stop, the MCU goes SAFE in under 3.5 s, the brain respawns and NORMAL returns on its own.</dd></div>
+      <div><dt>Cloud · EV fleet</dt><dd>Solar ×0.3 unannounced, or a hand over the ultrasonic sensor adds 30 kWh due by 06:00. The plan adapts on the next step.</dd></div>
+      <div><dt>Battery fault</dt><dd>Capacity and power halve. The plan, the clinic's secure hours and the servo gauge all respond at once.</dd></div>
+    </dl>
+  </section>
+
+  <section class="bottom">
+    <div>
+      <div class="sec-h">Real vs simulated</div>
+      <div class="honest">
+        <span class="chip real">REAL</span><span>Forecaster, LP/MPC brain, explanations, MCU safety supervisor, relay, LED matrix, buzzer, ESP32 clinic node, demand and solar data.</span>
+        <span class="chip sim">SIM</span><span>The power plant (30 kWp solar, 50 kWh battery, 24 kW genset, feeders). Clinic demand is modelled and labelled.</span>
+      </div>
+    </div>
+    <div>
+      <div class="sec-h">Why it matters</div>
+      <p>Runs <b>fully offline</b> on a credit-card-sized board, with no cloud and no deep nets or LLMs. Every decision has a rupee explanation an operator can check, and every number here is computed by the repo. Swap the plant twin for real meter readings and the same LP and safety logic run a real site.</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span><b>github.com/Arshgill01/GridQ</b> · code, benchmark, hardware photos, design decisions</span>
+    <span>Arduino UNO Q (QRB2210 + STM32U585) · ESP32 · Python · HiGHS · scikit-learn · FastAPI</span>
+  </footer>
+</div>
+</body>
+</html>

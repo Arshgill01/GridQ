@@ -12,7 +12,7 @@ It forecasts, optimises and explains every 15 minutes on an Arduino UNO Q, and i
 ![tests](https://img.shields.io/badge/tests-22_passing-1d7a49)
 ![ai](https://img.shields.io/badge/deep_nets_%2F_LLMs-none-44463f)
 
-<sub>Hack-O-Octo 4.0 · PS08 · Energy for the Next Billion</sub>
+<sub>Hack-O-Octo 4.0 · PS08 · Energy for the Next Billion · <a href="docs/GridQ-Project-Description.pdf">one-page project description (PDF)</a></sub>
 
 </div>
 
