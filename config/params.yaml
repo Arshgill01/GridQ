@@ -41,6 +41,7 @@ diesel:
   litres_per_kwh: 0.30
   rs_per_litre: 90             # => 27 Rs/kWh
   tank_litres: 100
+  refill_daily: true           # tank topped up to tank_litres at 00:00 (fuel still costed per litre burnt)
   co2_kg_per_litre: 2.68
 
 loads:                         # priority 1 = most critical

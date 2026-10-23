@@ -79,6 +79,28 @@ def counterfactuals(p: dict, data: lp.LPData, res: lp.LPResult, k: int, max_item
     return out
 
 
+def battery_idle(p: dict, data: lp.LPData, res: lp.LPResult) -> dict | None:
+    """Battery holding charge while the grid is up: what would discharging 10 kW now cost?"""
+    tr = res.trunk
+    if data.grid_cap[0] <= 0 or tr["dis"][0] > 0.5 or tr["ch"][0] > 0.5:
+        return None
+    room = (data.soc0 - data.soc_min) * p["battery"]["eta_discharge"] / DT
+    kw = min(10.0, data.p_dis, room)
+    if kw < 1.0:
+        return None
+    d2 = copy.copy(data)
+    d2.force_dis0 = kw
+    r2 = lp.solve(p, d2)
+    if not r2.ok:
+        return None
+    delta = r2.objective - res.objective
+    per_kwh = delta / (kw * DT)
+    return {"kind": "battery", "delta_rs": delta, "text":
+            f"Battery holding {data.soc0:.0f} kWh. Discharging {kw:.0f} kW now would cost Rs {delta:,.0f} more over the plan "
+            f"(Rs {per_kwh:.1f} per kWh delivered: wear plus buying it back later, against Rs {data.tariff[0]:.1f} grid now).",
+            "lcd": f"Batt held +Rs{delta:.0f}"[:16]}
+
+
 def hedge_text(data: lp.LPData, res: lp.LPResult) -> dict | None:
     """What the outage fan tree is buying: probability of an outage soon and its expected cost."""
     if not data.branches:
@@ -96,6 +118,9 @@ def explain(p: dict, data: lp.LPData, res: lp.LPResult, k: int, budget_ok: bool 
               "lcd": f"Rs{res.shadow_price:.1f}/kWh now"[:16]}]
     if budget_ok:
         items += counterfactuals(p, data, res, k)
+        b = battery_idle(p, data, res)
+        if b and b["delta_rs"] > 1:
+            items.append(b)
     h = hedge_text(data, res)
     if h:
         items.append(h)

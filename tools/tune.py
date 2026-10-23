@@ -16,10 +16,13 @@ from gridq.bench import run_days as R  # noqa: E402
 
 VARIANTS = {
     "spec: P90 reserve, deterministic": {"mpc": {"reserve_mode": "p90", "scenarios": {"enabled": False}}},
+    "P90 reserve released when islanded": {"mpc": {"reserve_mode": "p90_release", "scenarios": {"enabled": False}}},
     "no reserve, deterministic": {"mpc": {"reserve_mode": "none", "scenarios": {"enabled": False}}},
     "fan tree": {"mpc": {"reserve_mode": "none", "scenarios": {"enabled": True}}},
     "fan tree + P90 reserve": {"mpc": {"reserve_mode": "p90", "scenarios": {"enabled": True}}},
     "fan tree, 3 durations": {"mpc": {"reserve_mode": "none", "scenarios": {"enabled": True, "durations_steps": [2, 6, 11]}}},
+    "fan tree, terminal value 8": {"mpc": {"reserve_mode": "none", "terminal_value_rs_per_kwh": 8.0, "scenarios": {"enabled": True}}},
+    "fan tree, branches to 8 h": {"mpc": {"reserve_mode": "none", "scenarios": {"enabled": True, "branch_starts": [1, 2, 4, 8, 16, 32]}}},
     "fan tree, min-max fairness": {"mpc": {"reserve_mode": "none", "fairness": "minmax", "scenarios": {"enabled": True}}},
 }
 
@@ -28,6 +31,9 @@ def main(names=None):
     tune_days = 10
     base = R.run(["B1", "Oracle"], n_days=tune_days, quiet=True)
     out = {"B1": base["tune"]["B1"], "Oracle": base["tune"]["Oracle"], "variants": {}}
+    prev = ROOT / "data" / "bench" / "tune.json"
+    if prev.exists() and names:      # keep earlier variants when re-running a subset
+        out["variants"] = json.loads(prev.read_text()).get("variants", {})
     b1 = base["tune"]["B1"]["total_cost_rs"]["sum"]
     orc = base["tune"]["Oracle"]["total_cost_rs"]["sum"]
     print(f"{'variant':38s} {'total ₹':>10s} {'captured':>9s} {'unserved':>9s} {'wear ₹':>8s} {'jain':>5s} {'ms':>6s}")

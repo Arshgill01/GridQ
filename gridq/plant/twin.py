@@ -413,6 +413,8 @@ class Twin:
         if self.k % SPD == 0:
             self.shed_minutes = {l: 0.0 for l in INFLEX}
             self.peak_today = 0.0
+            if p["diesel"].get("refill_daily", False):
+                self.tank = p["diesel"]["tank_litres"]
         if self.k < self.tl.n_steps + SPD:
             self._activate()
         return {"k": k, "grid": grid, "ch": ch, "dis": dis, "dg": dg, "pv": pv, "curt": curt,

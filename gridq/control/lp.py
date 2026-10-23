@@ -50,10 +50,12 @@ class LPData:
     burden: dict = field(default_factory=lambda: {l: 1.0 for l in INFLEX})
     peak_so_far: float = 0.0
     reserve_kwh: float = 0.0             # 0 disables the reserve constraint
+    reserve_from: int = 1                # first step the reserve applies (released while islanded)
     branches: list = field(default_factory=list)
     fair_minmax: dict | None = None      # {"shed_kwh": {l}, "dem_kwh": {l}, "rs": float}
     force_p0: dict = field(default_factory=dict)   # counterfactual: load -> kW it must draw at t=0
     noshed0: list = field(default_factory=list)    # counterfactual: loads that may not be shed at t=0
+    force_dis0: float = 0.0                         # counterfactual: battery must discharge >= kW at t=0
 
 
 @dataclass
@@ -192,7 +194,18 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
         pk = B.var(1, pc, lb, np.inf)
         tr_peak[dd] = pk[0]
         B.rows_("ub", len(ts), [(np.arange(len(ts)), tr["grid"][ts], 1), (np.arange(len(ts)), np.full(len(ts), pk[0]), -1)], 0.0)
-    B.rows_("ub", 1, [(np.zeros(T, int), tr["dg"], DT * lpk)], d.tank0)
+    refill = p["diesel"].get("refill_daily", False)
+    full_tank = p["diesel"]["tank_litres"]
+
+    def fuel_rows(dg_idx, steps):
+        """Fuel budget per calendar day when the tank is refilled at midnight, else one budget."""
+        groups = [np.where(d.day_of[steps] == dd)[0] for dd in np.unique(d.day_of[steps])] if refill else [np.arange(len(steps))]
+        for g in groups:
+            dd = d.day_of[steps[g[0]]]
+            cap_l = d.tank0 if (not refill or dd == 0) else full_tank
+            B.rows_("ub", 1, [(np.zeros(len(g), int), dg_idx[g], DT * lpk)], cap_l)
+
+    fuel_rows(tr["dg"], np.arange(T))
     tr_slack = {}
     for j, s in enumerate(d.sessions):
         after = s["p_max"] * DT * max(0, s["d"] - T)
@@ -206,9 +219,11 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
             terms.append((np.zeros(len(tr["p"][j][1]), int), tr["p"][j][1], -DT))
         B.rows_("ub", 1, terms, -need)
     if d.reserve_kwh > 0:
+        # soc var t is the energy at step t+1; the reserve binds on steps >= reserve_from
+        a0 = max(0, d.reserve_from - 1)
         gap = B.var(T, m["reserve_penalty_rs_per_kwh"] * w_tr, 0, np.inf)
-        r = np.arange(T)
-        B.rows_("ub", T, [(r, tr["soc"], -1), (r, gap, -1)], -d.reserve_kwh)
+        r = np.arange(T - a0)
+        B.rows_("ub", T - a0, [(r, tr["soc"][a0:], -1), (r, gap[a0:], -1)], -d.reserve_kwh)
         tr["gap"] = gap
     # counterfactual forcing (explanations)
     for f, kw in d.force_p0.items():
@@ -244,11 +259,8 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
             B.add_cost(tr_peak[dd], -w * pc)
             B.rows_("ub", len(ts), [(np.arange(len(ts)), bv["grid"][ts], 1), (np.arange(len(ts)), np.full(len(ts), bp), -1)], 0.0)
             B.rows_("ub", 1, [(np.array([0]), np.array([tr_peak[dd]]), 1), (np.array([0]), np.array([bp]), -1)], 0.0)
-        # fuel along the path
-        terms = [(np.zeros(len(bv["dg"]), int), bv["dg"], DT * lpk)]
-        if br.tau > 0:
-            terms.append((np.zeros(br.tau, int), tr["dg"][:br.tau], DT * lpk))
-        B.rows_("ub", 1, terms, d.tank0)
+        # fuel along the path (trunk steps before tau + branch steps), per day if refilled
+        fuel_rows(np.concatenate([tr["dg"][:br.tau], bv["dg"]]), np.arange(br.end))
         # sessions
         for j, s in enumerate(d.sessions):
             if j not in bv["p"] and not (s["a"] < br.end and s["d"] > br.tau):
@@ -289,6 +301,8 @@ def solve(p: dict, d: LPData, time_limit: float | None = None) -> LPResult:
     bounds = np.column_stack([np.concatenate(B.lb), np.concatenate(B.ub)])
     for i in getattr(B, "_noshed", []):
         bounds[i, 1] = 0.0
+    if d.force_dis0 > 0:
+        bounds[tr["dis"][0], 0] = min(d.force_dis0, bounds[tr["dis"][0], 1])
     mats = B.matrices()
     A_eq, b_eq = mats["eq"]
     A_ub, b_ub = mats["ub"]

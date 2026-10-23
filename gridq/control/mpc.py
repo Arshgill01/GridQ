@@ -127,16 +127,20 @@ class MPC(Controller):
             shed = {l: ft[l]["shed_kwh"] for l in FAIR}
             dem = {l: ft[l]["dem_kwh"] + float(np.sum(p50[l][today]) * DT) for l in FAIR}
             fair_minmax = {"shed_kwh": shed, "dem_kwh": dem, "rs": m["fairness_minmax_rs"]}
-        reserve = 0.0
-        if m["reserve_mode"] == "p90" and not self.oracle:
+        reserve, reserve_from = 0.0, 1
+        if m["reserve_mode"] in ("p90", "p90_release") and not self.oracle:
             H = int(m["reserve_hours_clinic"] / DT)
             reserve = float(np.mean(p90["clinic"][:H])) * m["reserve_hours_clinic"]
+        grid_cap = self.grid_cap(obs, tw, T)
+        if m["reserve_mode"] == "p90_release" and not obs.grid_up:
+            up = np.where(grid_cap > 0)[0]
+            reserve_from = int(up[0]) + 1 if len(up) else T     # the reserve is for after the outage
         data = lp.LPData(
             T=T, pv=pv, dem={l: np.maximum(p50[l], 0.0) for l in INFLEX}, tariff=tw.tariff_slice(k, k + T),
-            grid_cap=self.grid_cap(obs, tw, T), day_of=day_of,
+            grid_cap=grid_cap, day_of=day_of,
             soc0=obs.soc, soc_min=obs.soc_min, soc_max=obs.soc_max, p_ch=obs.p_ch_max, p_dis=obs.p_dis_max,
             tank0=obs.tank_l, sessions=self.sessions(obs, tw, T), burden=burden,
-            peak_so_far=obs.peak_today, reserve_kwh=reserve,
+            peak_so_far=obs.peak_today, reserve_kwh=reserve, reserve_from=reserve_from,
             branches=[] if self.oracle else self.branches(obs, T), fair_minmax=fair_minmax)
         return data, {"p50": p50, "p90": p90, "pv": pv}
 

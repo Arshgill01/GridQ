@@ -77,3 +77,27 @@ construction, then reported on held-out days.
 
 The spec's lat/lon was Chandigarh, but I-BLEND is IIIT-Delhi. Solar is fetched for IIIT-Delhi
 (28.5459 N, 77.2732 E) so demand and weather come from the same place *and* the same days.
+
+## D8. Diesel tank is refilled daily (plant-model fix)
+
+First real-data run: GridQ came out *worse* than B1, with 2,214 kWh unserved on the tune days. The diagnosis
+(`grid up` shed steps = 0) showed every shed step was in an outage, after the 100 L tank had run
+dry. At 1.5 outages/day the tank lasts about 5 days and is never refilled, so from day 6 onward
+every controller sheds in every outage, and whoever burnt fuel early (GridQ, which correctly
+prefers ₹27/kWh diesel to ₹40/kWh shedding) pays later. A real campus tops up its genset tank.
+Now: `diesel.refill_daily: true` (tank back to 100 L at 00:00, every litre still costed at ₹90),
+and the LP has one fuel budget per calendar day in its horizon (trunk and branches).
+
+## D9. Single-threaded OpenMP
+
+sklearn's GBM predict fans out to OpenMP threads per tree; with 5 benchmark processes (or the web
+server on the 4-core board) this made one 95-row forecast take 700 ms. With `OMP_NUM_THREADS=1`
+(set in `gridq/__init__.py`) it takes 2.3 ms per model (14 ms for all six). The LP solve is about 10 ms.
+
+## Observation: grid arbitrage never pays here (and the LP knows it)
+
+Buying at the 6.8 ₹/kWh solar-hour tariff to discharge at 9.6 ₹ peak costs
+6.8/(0.95·0.95) + 2.3·(1/0.9025 + 1) ≈ 12.4 ₹ per delivered kWh, which is more than 9.6 ₹. So
+GridQ deliberately does *not* cycle the battery for ToD arbitrage (B1 does, and pays for it in wear).
+The battery's value is PV shifting, the 40 kW cap, the demand charge and, above all, outages.
+The dashboard explains this with a re-solve: "Discharging 10 kW now would cost ₹X more".
